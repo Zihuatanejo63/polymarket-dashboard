@@ -131,10 +131,9 @@ const SettingsPage = () => {
 
   const handleImportFavorites = async () => {
     try {
-      // 获取所有可用事件
+      // 获取所有可用事件（手动构建query参数）
       const res = await Network.request({
-        url: '/api/market/events',
-        data: { page: 1, pageSize: 50 }
+        url: '/api/market/events?page=1&pageSize=50'
       })
 
       if (res.data?.code === 200) {
