@@ -1,11 +1,11 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Picker } from '@tarojs/components'
 import Taro, { useLoad, showToast } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Sparkles, Share2, Download, LogIn, Check } from 'lucide-react-taro'
+import { User, Sparkles, Share2, Download, LogIn, Check, Clock } from 'lucide-react-taro'
 import './index.config'
 
 interface AnalysisResult {
@@ -27,13 +27,19 @@ const SettingsPage = () => {
   // 弹窗状态
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false)
+  const [showTimePicker, setShowTimePicker] = useState(false)
   const [allEvents, setAllEvents] = useState<any[]>([])
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set())
+
+  // 定时报告设置
+  const [scheduledTime, setScheduledTime] = useState<string>('09:00')
+  const [scheduleEnabled, setScheduleEnabled] = useState(false)
 
   useLoad(() => {
     checkLoginStatus()
     loadFavorites()
     loadAnalysisResults()
+    loadScheduleSettings()
   })
 
   const checkLoginStatus = () => {
@@ -121,6 +127,22 @@ const SettingsPage = () => {
       }
     } catch (error) {
       console.error('加载分析结果失败:', error)
+    }
+  }
+
+  const loadScheduleSettings = async () => {
+    try {
+      const res = await Network.request({
+        url: '/api/schedule/settings'
+      })
+
+      if (res.data?.code === 200) {
+        const settings = res.data.data
+        setScheduledTime(settings.time || '09:00')
+        setScheduleEnabled(settings.enabled || false)
+      }
+    } catch (error) {
+      console.error('加载定时设置失败:', error)
     }
   }
 
@@ -261,6 +283,41 @@ const SettingsPage = () => {
     return shareContent
   }
 
+  const handleTimeChange = (e: any) => {
+    const { value } = e.detail
+    const hour = value[0].toString().padStart(2, '0')
+    const minute = value[1].toString().padStart(2, '0')
+    setScheduledTime(`${hour}:${minute}`)
+  }
+
+  const confirmTimeSetting = async () => {
+    try {
+      const res = await Network.request({
+        url: '/api/schedule/settings',
+        method: 'POST',
+        data: {
+          enabled: true,
+          time: scheduledTime
+        }
+      })
+
+      if (res.data?.code === 200) {
+        setScheduleEnabled(true)
+        setShowTimePicker(false)
+        showToast({
+          title: `已设置为每天 ${scheduledTime} 发送报告`,
+          icon: 'success'
+        })
+      }
+    } catch (error) {
+      console.error('保存定时设置失败:', error)
+      showToast({
+        title: '设置失败',
+        icon: 'none'
+      })
+    }
+  }
+
   return (
     <ScrollView scrollY className="min-h-screen bg-gray-50">
       {/* 用户登录卡片 */}
@@ -341,6 +398,18 @@ const SettingsPage = () => {
             <Sparkles size={18} strokeWidth={2} color="#3B82F6" />
             <Text className="block text-sm font-semibold text-blue-600">
               {isAnalyzing ? `分析中 (${Object.keys(analysisResults).length}/${favorites.length})...` : '一键 AI 分析'}
+            </Text>
+          </Button>
+
+          {/* 定时报告设置 */}
+          <Button
+            variant="outline"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200"
+            onClick={() => setShowTimePicker(true)}
+          >
+            <Clock size={18} strokeWidth={2} color="#F59E0B" />
+            <Text className="block text-sm font-semibold text-orange-600">
+              定时报告设置 {scheduleEnabled && `(${scheduledTime})`}
             </Text>
           </Button>
 
@@ -594,6 +663,70 @@ const SettingsPage = () => {
                 <Text className="block text-sm">
                   {isAnalyzing ? '分析中...' : `开始分析 (${selectedEvents.size})`}
                 </Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 时间选择器弹窗 */}
+      {showTimePicker && (
+        <View
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
+          onClick={() => setShowTimePicker(false)}
+        >
+          <View
+            className="bg-white rounded-t-2xl w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 标题 */}
+            <View className="flex items-center justify-between mb-6">
+              <Text className="block text-lg font-bold text-gray-900">设置定时报告</Text>
+              <Clock size={24} strokeWidth={2} color="#F59E0B" />
+            </View>
+
+            {/* 时间选择器 */}
+            <View className="mb-6">
+              <Text className="block text-sm text-gray-600 mb-3">
+                选择每天发送报告的时间
+              </Text>
+              <View className="bg-gray-50 rounded-xl p-4">
+                <Picker
+                  mode="multiSelector"
+                  range={[
+                    Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0')),
+                    Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'))
+                  ]}
+                  value={[
+                    parseInt(scheduledTime.split(':')[0]),
+                    parseInt(scheduledTime.split(':')[1])
+                  ]}
+                  onChange={handleTimeChange}
+                >
+                  <View className="flex items-center justify-center gap-2 py-4">
+                    <Text className="block text-3xl font-bold text-orange-600">
+                      {scheduledTime}
+                    </Text>
+                    <Text className="block text-sm text-gray-500">每天</Text>
+                  </View>
+                </Picker>
+              </View>
+            </View>
+
+            {/* 操作按钮 */}
+            <View className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowTimePicker(false)}
+              >
+                <Text className="block text-sm">取消</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-orange-500 text-white"
+                onClick={confirmTimeSetting}
+              >
+                <Text className="block text-sm">确定</Text>
               </Button>
             </View>
           </View>
