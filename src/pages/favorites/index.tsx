@@ -64,10 +64,18 @@ const FavoritesPage = () => {
       console.log('Favorites Response:', res.data)
 
       if (res.data?.code === 200) {
-        setFavorites(res.data.data || [])
+        const data = res.data.data || []
+        console.log('Favorites count:', data.length)
+        setFavorites(data)
+      } else {
+        console.error('Invalid response code:', res.data?.code)
       }
     } catch (error) {
       console.error('加载收藏列表失败:', error)
+      showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
     } finally {
       setLoading(false)
     }
@@ -212,14 +220,14 @@ const FavoritesPage = () => {
               </View>
             ))}
           </View>
-        ) : favorites.length === 0 ? (
+        ) : favorites.length === 0 && !loading ? (
           <View className="flex flex-col items-center justify-center py-20">
             <Star size={48} color="#ddd" strokeWidth={2} className="mb-4" />
             <Text className="block text-center text-gray-500 text-sm mb-2">
               暂无收藏
             </Text>
             <Text className="block text-center text-gray-400 text-xs">
-              点击首页卡片的星标添加收藏
+              在首页点击星标添加收藏
             </Text>
           </View>
         ) : (

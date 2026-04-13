@@ -142,9 +142,15 @@ const IndexPage = () => {
         url: '/api/favorites'
       })
 
+      console.log('Load favorited ids response:', res.data)
+
       if (res.data?.code === 200) {
-        const ids = new Set(res.data.data.map((e: MarketEvent) => e.id)) as Set<string>
+        const data = res.data.data || []
+        const ids = new Set(data.map((e: MarketEvent) => e.id)) as Set<string>
+        console.log('Favorited ids:', Array.from(ids))
         setFavoritedIds(ids)
+      } else {
+        console.error('Invalid response code:', res.data?.code)
       }
     } catch (error) {
       console.error('加载收藏列表失败:', error)
@@ -382,7 +388,10 @@ const IndexPage = () => {
                         size={20}
                         color={favoritedIds.has(event.id) ? '#FFD700' : '#999'}
                         strokeWidth={favoritedIds.has(event.id) ? 3 : 2}
-                        onClick={() => handleToggleFavorite(event.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleFavorite(event.id)
+                        }}
                       />
                     </View>
                   </View>

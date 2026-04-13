@@ -1,6 +1,6 @@
-import { View, Text, ScrollView, Canvas } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -137,107 +137,11 @@ const DetailPage = () => {
       '热榜': 'bg-orange-100 text-orange-700',
       '金融': 'bg-yellow-100 text-yellow-700',
       '体育': 'bg-green-100 text-green-700',
-      '科技': 'bg-blue-100 text-blue-700'
+      '科技': 'bg-blue-100 text-blue-700',
+      '其他': 'bg-gray-100 text-gray-700'
     }
     return colorMap[category] || 'bg-gray-100 text-gray-700'
   }
-
-  // 绘制折线图
-  const drawChart = (history7Days: Array<{ date: string; probability: number }>) => {
-    if (!history7Days || history7Days.length === 0) return
-
-    const canvasId = 'chartCanvas'
-    const query = Taro.createSelectorQuery()
-    query.select(`#${canvasId}`)
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (!res[0]) return
-
-        const canvas = res[0].node
-        const ctx = canvas.getContext('2d')
-        const dpr = Taro.getSystemInfoSync().pixelRatio
-
-        canvas.width = res[0].width * dpr
-        canvas.height = res[0].height * dpr
-        ctx.scale(dpr, dpr)
-
-        const width = res[0].width
-        const height = res[0].height
-        const padding = 40
-
-        // 清空画布
-        ctx.clearRect(0, 0, width, height)
-
-        // 找出最大最小值
-        const probabilities = history7Days.map(h => h.probability)
-        const max = Math.max(...probabilities, 100)
-        const min = Math.min(...probabilities, 0)
-        const range = max - min
-
-        // 绘制坐标轴
-        ctx.beginPath()
-        ctx.strokeStyle = '#E5E7EB'
-        ctx.lineWidth = 1
-        // X轴
-        ctx.moveTo(padding, height - padding)
-        ctx.lineTo(width - padding, height - padding)
-        // Y轴
-        ctx.moveTo(padding, padding)
-        ctx.lineTo(padding, height - padding)
-        ctx.stroke()
-
-        // 绘制折线
-        ctx.beginPath()
-        ctx.strokeStyle = '#3B82F6'
-        ctx.lineWidth = 2
-
-        const xStep = (width - 2 * padding) / (history7Days.length - 1)
-
-        history7Days.forEach((item, index) => {
-          const x = padding + index * xStep
-          const y = height - padding - ((item.probability - min) / range) * (height - 2 * padding)
-
-          if (index === 0) {
-            ctx.moveTo(x, y)
-          } else {
-            ctx.lineTo(x, y)
-          }
-        })
-
-        ctx.stroke()
-
-        // 绘制数据点
-        history7Days.forEach((item, index) => {
-          const x = padding + index * xStep
-          const y = height - padding - ((item.probability - min) / range) * (height - 2 * padding)
-
-          ctx.beginPath()
-          ctx.fillStyle = '#3B82F6'
-          ctx.arc(x, y, 4, 0, 2 * Math.PI)
-          ctx.fill()
-        })
-
-        // 绘制日期标签
-        ctx.fillStyle = '#6B7280'
-        ctx.font = '10px sans-serif'
-        ctx.textAlign = 'center'
-        history7Days.forEach((item, index) => {
-          const x = padding + index * xStep
-          const date = new Date(item.date)
-          const label = `${date.getMonth() + 1}/${date.getDate()}`
-          ctx.fillText(label, x, height - padding + 15)
-        })
-      })
-  }
-
-  useEffect(() => {
-    if (event?.history7Days) {
-      // 延迟绘制，确保 Canvas 已经渲染
-      setTimeout(() => {
-        drawChart(event.history7Days!)
-      }, 100)
-    }
-  }, [event])
 
   if (loading) {
     return (
@@ -332,9 +236,36 @@ const DetailPage = () => {
           <CardHeader>
             <CardTitle className="text-base">7 日走势</CardTitle>
           </CardHeader>
-          <CardContent>
-            <View className="h-48">
-              <Canvas id="chartCanvas" type="2d" className="w-full h-full"></Canvas>
+          <CardContent className="p-4">
+            <View className="space-y-3">
+              {event.history7Days.map((item, index) => {
+                const isToday = index === event.history7Days!.length - 1
+                const date = new Date(item.date)
+                const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
+
+                return (
+                  <View key={item.date} className="flex items-center gap-3">
+                    <Text className={`block text-xs w-12 ${isToday ? 'font-bold text-blue-600' : 'text-gray-500'}`}>
+                      {dateStr}{isToday ? ' (今天)' : ''}
+                    </Text>
+                    <View className="flex-1">
+                      <Progress
+                        value={item.probability}
+                        className="h-2"
+                        style={{
+                          '--progress-background': getProbabilityColor(item.probability)
+                        } as any}
+                      />
+                    </View>
+                    <Text
+                      className={`block text-xs w-12 text-right ${isToday ? 'font-bold' : 'text-gray-600'}`}
+                      style={{ color: getProbabilityColor(item.probability) }}
+                    >
+                      {item.probability.toFixed(1)}%
+                    </Text>
+                  </View>
+                )
+              })}
             </View>
           </CardContent>
         </Card>
