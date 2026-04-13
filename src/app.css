@@ -58,6 +58,12 @@ root-portal {
   --tw-ring-offset-width: 0px;
   --tw-ring-offset-color: #fff;
   --tw-ring-offset-shadow: 0 0 #0000;
+  /* 概率语义化颜色 */
+  --probability-high: #00E5A0;
+  --probability-likely: #FFB020;
+  --probability-neutral: #4A90D9;
+  --probability-unlikely: #FF4D6A;
+  --probability-low: #FF1744;
 }
 
 .dark {
