@@ -300,25 +300,27 @@ const FavoritesPage = () => {
                     </View>
 
                     {/* 底部信息 */}
-                    <View className="flex items-center justify-between mb-3">
-                      <View className="flex items-center gap-4 text-xs text-gray-500">
-                        <Text className="block">${event.price.toFixed(3)}</Text>
-                        <Text className="block">
-                          24h量 {formatNumber(event.volume24h)}
-                        </Text>
-                      </View>
+                    <View className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+                      <Text className="block">${event.price.toFixed(3)}</Text>
+                      <Text className="block">
+                        24h量 {formatNumber(event.volume24h)}
+                      </Text>
+                    </View>
+
+                    {/* AI 分析按钮 */}
+                    <View className="mt-3">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex items-center gap-1"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleAnalyze(event.id)
                         }}
                       >
-                        <Sparkles size={14} strokeWidth={2} color="#666" />
-                        <Text className="block text-xs text-blue-600">
-                          {isAnalyzing ? '分析中...' : analysis ? '重新分析' : 'AI分析'}
+                        <Sparkles size={16} strokeWidth={2} color="#3B82F6" />
+                        <Text className="block text-sm font-semibold text-blue-600">
+                          {isAnalyzing ? 'AI 分析中...' : analysis ? '重新 AI 分析' : '一键 AI 智能分析'}
                         </Text>
                       </Button>
                     </View>
