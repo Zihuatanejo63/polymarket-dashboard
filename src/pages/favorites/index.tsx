@@ -56,22 +56,27 @@ const FavoritesPage = () => {
 
         if (data.length > 0) {
           console.log('第一个收藏项:', data[0])
+        } else {
+          console.log('收藏列表为空')
         }
       } else {
         console.error('Invalid response code:', res.data?.code)
+        console.error('Error message:', res.data?.msg)
         showToast({
-          title: '加载失败',
+          title: res.data?.msg || '加载失败',
           icon: 'none'
         })
       }
     } catch (error) {
       console.error('加载收藏列表失败:', error)
+      console.error('Error details:', error?.message || error)
       showToast({
         title: '加载失败',
         icon: 'none'
       })
     } finally {
       setLoading(false)
+      console.log('加载完成，loading状态:', false)
     }
   }
 
