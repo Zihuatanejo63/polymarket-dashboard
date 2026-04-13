@@ -5,9 +5,10 @@ import { MarketModule } from './market/market.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { NotificationModule } from './notification/notification.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { PolymarketModule } from './polymarket/polymarket.module';
 
 @Module({
-  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule],
+  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule, PolymarketModule],
   controllers: [AppController],
   providers: [AppService],
 })

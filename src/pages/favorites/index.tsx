@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Star, Sparkles, Share2 } from 'lucide-react-taro'
+import { Star, Sparkles, Clock, Share } from 'lucide-react-taro'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import './index.config'
@@ -25,6 +25,14 @@ interface AnalysisResult {
   implications: string[]
   riskFactors: string[]
   confidence: '高' | '中' | '低'
+  realityConnection: string
+  impactScenarios: string[]
+}
+
+interface ScheduledAnalysis {
+  eventId: string
+  time: string
+  enabled: boolean
 }
 
 const FavoritesPage = () => {
@@ -32,6 +40,8 @@ const FavoritesPage = () => {
   const [loading, setLoading] = useState(false)
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
   const [analysisResults, setAnalysisResults] = useState<Record<string, AnalysisResult>>({})
+  const [scheduledAnalyses, setScheduledAnalyses] = useState<Record<string, ScheduledAnalysis>>({})
+  const [showScheduleDialog, setShowScheduleDialog] = useState<string | null>(null)
 
   // 设置分享
   useShareAppMessage(() => {
@@ -168,10 +178,68 @@ const FavoritesPage = () => {
     }
   }
 
-  const handleShare = async (_event: MarketEvent) => {
+  const handleShare = async (event: MarketEvent, analysis?: AnalysisResult) => {
+    const shareData = {
+      title: `${event.question} - 概率${event.probability.toFixed(1)}%`,
+      path: `/pages/detail/index?id=${event.id}`,
+      imageUrl: ''
+    }
+
+    if (analysis) {
+      // 如果有AI分析结果，添加到分享内容
+      console.log('分享AI分析结果:', analysis)
+      showToast({
+        title: 'AI分析结果已准备分享',
+        icon: 'success',
+        duration: 2000
+      })
+    } else {
+      // 普通事件分享
+      showToast({
+        title: '请在右上角菜单中分享',
+        icon: 'none',
+        duration: 2000
+      })
+    }
+
+    return shareData
+  }
+
+  const handleScheduleAnalysis = (eventId: string) => {
+    setShowScheduleDialog(eventId)
+  }
+
+  const confirmScheduleAnalysis = (eventId: string, time: string) => {
+    setScheduledAnalyses(prev => ({
+      ...prev,
+      [eventId]: {
+        eventId,
+        time,
+        enabled: true
+      }
+    }))
+
+    setShowScheduleDialog(null)
+
     showToast({
-      title: '请在右上角菜单中分享',
-      icon: 'none',
+      title: `已设置${time}定时分析`,
+      icon: 'success',
+      duration: 2000
+    })
+
+    console.log('设置定时分析:', eventId, time)
+  }
+
+  const cancelScheduledAnalysis = (eventId: string) => {
+    setScheduledAnalyses(prev => {
+      const newScheduled = { ...prev }
+      delete newScheduled[eventId]
+      return newScheduled
+    })
+
+    showToast({
+      title: '已取消定时分析',
+      icon: 'success',
       duration: 2000
     })
   }
@@ -267,14 +335,9 @@ const FavoritesPage = () => {
                         <Text className="block text-xs">{event.category}</Text>
                       </Badge>
                       <View className="flex items-center gap-2">
-                        <Share2
-                          size={18}
-                          color="#666"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleShare(event)
-                          }}
-                        />
+                        {scheduledAnalyses[event.id] && (
+                          <Clock size={18} color="#3B82F6" strokeWidth={2} />
+                        )}
                         <Star
                           size={20}
                           color="#FFD700"
@@ -288,7 +351,7 @@ const FavoritesPage = () => {
                     </View>
 
                     {/* 问题文本 */}
-                    <Text className="block text-sm text-gray-900 mb-4 line-clamp-2 leading-relaxed">
+                    <Text className="block text-sm text-gray-900 mb-3 line-clamp-2 leading-relaxed">
                       {event.question}
                     </Text>
 
@@ -325,12 +388,12 @@ const FavoritesPage = () => {
                       </Text>
                     </View>
 
-                    {/* AI 分析按钮 */}
-                    <View className="mt-3">
+                    {/* AI 分析按钮和操作区 */}
+                    <View className="mt-3 pt-3 border-t border-gray-100">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200"
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200 mb-2"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleAnalyze(event.id)
@@ -341,32 +404,109 @@ const FavoritesPage = () => {
                           {isAnalyzing ? 'AI 分析中...' : analysis ? '重新 AI 分析' : '一键 AI 智能分析'}
                         </Text>
                       </Button>
+
+                      {/* 定时和分享按钮 */}
+                      <View className="flex gap-2 mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 flex items-center justify-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (scheduledAnalyses[event.id]) {
+                              cancelScheduledAnalysis(event.id)
+                            } else {
+                              handleScheduleAnalysis(event.id)
+                            }
+                          }}
+                        >
+                          <Clock size={14} strokeWidth={2} color={scheduledAnalyses[event.id] ? '#3B82F6' : '#666'} />
+                          <Text className="block text-xs text-gray-600">
+                            {scheduledAnalyses[event.id] ? '取消定时' : '定时分析'}
+                          </Text>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 flex items-center justify-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleShare(event, analysis)
+                          }}
+                        >
+                          <Share size={14} strokeWidth={2} color="#666" />
+                          <Text className="block text-xs text-gray-600">
+                            分享
+                          </Text>
+                        </Button>
+                      </View>
                     </View>
 
-                    {/* AI 分析结果 */}
+                    {/* AI 分析结果 - 位于最下方 */}
                     {analysis && (
-                      <View className="bg-blue-50 rounded-xl p-3 mt-3">
-                        <View className="flex items-center gap-2 mb-2">
-                          <Sparkles size={14} strokeWidth={2} color="#3B82F6" />
-                          <Text className="block text-xs font-semibold text-blue-700">
-                            AI 分析
+                      <View className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-4 mt-3 border border-blue-100">
+                        <View className="flex items-center gap-2 mb-3">
+                          <Sparkles size={16} strokeWidth={2} color="#3B82F6" />
+                          <Text className="block text-sm font-bold text-blue-700">
+                            AI 深度分析
                           </Text>
                           <Badge className="bg-blue-100 text-blue-700 ml-auto">
                             <Text className="block text-xs">置信度: {analysis.confidence}</Text>
                           </Badge>
                         </View>
-                        <Text className="block text-xs text-gray-700 mb-2 leading-relaxed">
-                          {analysis.summary}
-                        </Text>
-                        <View className="mt-2">
-                          <Text className="block text-xs font-semibold text-gray-700 mb-1">
-                            潜在影响：
-                          </Text>
-                          {analysis.implications.map((imp, idx) => (
-                            <Text key={idx} className="block text-xs text-gray-600 mb-1">
-                              • {imp}
+
+                        <View className="space-y-3">
+                          {/* 现实联系 */}
+                          <View>
+                            <Text className="block text-xs font-semibold text-gray-700 mb-2">
+                              🌍 现实意义
                             </Text>
-                          ))}
+                            <Text className="block text-xs text-gray-700 leading-relaxed">
+                              {analysis.summary}
+                            </Text>
+                          </View>
+
+                          {/* 影响场景 */}
+                          {analysis.impactScenarios && analysis.impactScenarios.length > 0 && (
+                            <View>
+                              <Text className="block text-xs font-semibold text-gray-700 mb-2">
+                                📊 影响场景
+                              </Text>
+                              {analysis.impactScenarios.map((scenario, idx) => (
+                                <Text key={idx} className="block text-xs text-gray-600 mb-1 leading-relaxed">
+                                  {idx + 1}. {scenario}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+
+                          {/* 潜在影响 */}
+                          {analysis.implications && analysis.implications.length > 0 && (
+                            <View>
+                              <Text className="block text-xs font-semibold text-gray-700 mb-2">
+                                💡 潜在影响
+                              </Text>
+                              {analysis.implications.map((imp, idx) => (
+                                <Text key={idx} className="block text-xs text-gray-600 mb-1 leading-relaxed">
+                                  • {imp}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
+
+                          {/* 风险因素 */}
+                          {analysis.riskFactors && analysis.riskFactors.length > 0 && (
+                            <View>
+                              <Text className="block text-xs font-semibold text-gray-700 mb-2">
+                                ⚠️ 风险因素
+                              </Text>
+                              {analysis.riskFactors.map((risk, idx) => (
+                                <Text key={idx} className="block text-xs text-gray-600 mb-1 leading-relaxed">
+                                  • {risk}
+                                </Text>
+                              ))}
+                            </View>
+                          )}
                         </View>
                       </View>
                     )}
@@ -374,6 +514,36 @@ const FavoritesPage = () => {
                 </Card>
               )
             })}
+          </View>
+        )}
+
+        {/* 定时分析选择弹窗 */}
+        {showScheduleDialog && (
+          <View
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
+            onClick={() => setShowScheduleDialog(null)}
+          >
+            <View
+              className="bg-white rounded-t-2xl w-full max-w-md p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <View className="flex items-center justify-between mb-4">
+                <Text className="block text-base font-bold text-gray-900">设置定时分析</Text>
+                <Clock size={20} color="#666" />
+              </View>
+
+              <View className="space-y-3">
+                {['每日8:00', '每日12:00', '每日18:00', '每日20:00', '每周一9:00'].map((time) => (
+                  <View
+                    key={time}
+                    className="bg-gray-50 rounded-xl p-3 active:bg-gray-100"
+                    onClick={() => confirmScheduleAnalysis(showScheduleDialog, time)}
+                  >
+                    <Text className="block text-sm text-gray-900">{time}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
         )}
       </ScrollView>
