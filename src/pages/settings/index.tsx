@@ -1,12 +1,11 @@
-import { View, Text, ScrollView, Picker } from '@tarojs/components'
+import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useLoad, showToast } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Sparkles, Share2, Download, LogIn, Bell, Check, Clock } from 'lucide-react-taro'
+import { User, Sparkles, Share2, Download, LogIn, Check } from 'lucide-react-taro'
 import './index.config'
 
 interface AnalysisResult {
@@ -24,14 +23,10 @@ const SettingsPage = () => {
   const [analysisResults, setAnalysisResults] = useState<Record<string, AnalysisResult>>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [selectedHour, setSelectedHour] = useState(8)
-  const [selectedMinute, setSelectedMinute] = useState(0)
 
   // 弹窗状态
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false)
-  const [showTimeDialog, setShowTimeDialog] = useState(false)
   const [allEvents, setAllEvents] = useState<any[]>([])
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set())
 
@@ -199,7 +194,7 @@ const SettingsPage = () => {
     }
   }
 
-  const handleAnalyzeAll = () => {
+  const handleBatchAnalyze = async () => {
     if (favorites.length === 0) {
       showToast({
         title: '请先导入收藏',
@@ -208,23 +203,9 @@ const SettingsPage = () => {
       return
     }
 
-    // 初始化选中状态：默认全选
-    setSelectedEvents(new Set(favorites.map(f => f.id)))
-    setShowAnalysisDialog(true)
-  }
-
-  const startAnalysis = async () => {
-    if (selectedEvents.size === 0) {
-      showToast({
-        title: '请选择要分析的事件',
-        icon: 'none'
-      })
-      return
-    }
-
     setIsAnalyzing(true)
     try {
-      const eventIds = Array.from(selectedEvents)
+      const eventIds = favorites.map(f => f.id)
 
       const res = await Network.request({
         url: '/api/analysis/batch',
@@ -234,10 +215,8 @@ const SettingsPage = () => {
 
       if (res.data?.code === 200) {
         setAnalysisResults(res.data.data || {})
-        setShowAnalysisDialog(false)
-
         showToast({
-          title: `已完成 ${eventIds.length} 个事件的分析`,
+          title: `分析完成 ${Object.keys(res.data.data || {}).length} 个事件`,
           icon: 'success'
         })
       }
@@ -250,29 +229,6 @@ const SettingsPage = () => {
     } finally {
       setIsAnalyzing(false)
     }
-  }
-
-  const handleTimePickerChange = (e: any) => {
-    const { value } = e.detail
-    setSelectedHour(value[0])
-    // 分钟索引转换为实际分钟数（0-11对应0-55，每5分钟）
-    setSelectedMinute(value[1] * 5)
-  }
-
-  const confirmTimePicker = () => {
-    const schedule = `每日${selectedHour}:${selectedMinute.toString().padStart(2, '0')}`
-
-    // 调用后端设置定时任务
-    Network.request({
-      url: '/api/notification/schedule',
-      method: 'POST',
-      data: { schedule }
-    })
-
-    showToast({
-      title: `已设置每日 ${selectedHour}:${selectedMinute.toString().padStart(2, '0')} 定时报告`,
-      icon: 'success'
-    })
   }
 
   const handleShareAll = async () => {
@@ -375,34 +331,20 @@ const SettingsPage = () => {
             </Text>
           </Button>
 
-          {/* 全部 AI 分析 */}
+          {/* 一键AI分析 */}
           <Button
             variant="outline"
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200"
-            onClick={handleAnalyzeAll}
+            onClick={handleBatchAnalyze}
             disabled={isAnalyzing || favorites.length === 0}
           >
             <Sparkles size={18} strokeWidth={2} color="#3B82F6" />
             <Text className="block text-sm font-semibold text-blue-600">
-              {isAnalyzing ? '分析中...' : '全部 AI 分析'}
+              {isAnalyzing ? `分析中 (${Object.keys(analysisResults).length}/${favorites.length})...` : '一键 AI 分析'}
             </Text>
           </Button>
 
-          {/* 定时报告设置 */}
-          <Button
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2"
-            onClick={() => setShowTimeDialog(true)}
-          >
-            <Bell size={18} strokeWidth={2} color="#666" />
-            <Text className="block text-sm">
-              {notificationsEnabled
-                ? `定时报告 (${selectedHour}:${selectedMinute.toString().padStart(2, '0')})`
-                : '设置定时报告'}
-            </Text>
-          </Button>
-
-          {/* 分享按钮 */}
+          {/* 分享按钮（分析完成后显示） */}
           {Object.keys(analysisResults).length > 0 && (
             <Button
               variant="outline"
@@ -622,86 +564,6 @@ const SettingsPage = () => {
               </View>
             </ScrollView>
 
-            {/* 定时报告设置 */}
-            <View className="border-t border-gray-200 pt-3 mb-3">
-              <View className="flex items-center justify-between mb-2">
-                <Text className="block text-sm font-semibold text-gray-700">
-                  <Bell size={14} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
-                  定时报告
-                </Text>
-                <Switch
-                  checked={notificationsEnabled}
-                  onCheckedChange={(checked) => setNotificationsEnabled(checked)}
-                />
-              </View>
-
-              {notificationsEnabled && (
-                <View>
-                  {/* 苹果闹钟样式的滚轮时间选择器 */}
-                  <View className="bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
-                    <Text className="block text-sm font-semibold text-gray-700 mb-3">
-                      <Clock
-                        size={16}
-                        strokeWidth={2}
-                        color="#666"
-                        style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }}
-                      />
-                      设置定时报告时间
-                    </Text>
-
-                    {/* 时间选择器 */}
-                    <Picker
-                      mode="multiSelector"
-                      range={[
-                        Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}时`),
-                        ['00分', '05分', '10分', '15分', '20分', '25分', '30分', '35分', '40分', '45分', '50分', '55分']
-                      ]}
-                      value={[selectedHour, Math.floor(selectedMinute / 5)]}
-                      onChange={handleTimePickerChange}
-                    >
-                      <View className="bg-white rounded-lg p-4 border border-gray-300">
-                        <View className="flex items-center justify-center gap-3">
-                          <View className="flex-1 text-center">
-                            <Text className="block text-4xl font-bold text-blue-600">
-                              {selectedHour.toString().padStart(2, '0')}
-                            </Text>
-                            <Text className="block text-xs text-gray-500 mt-1">时</Text>
-                          </View>
-                          <Text className="block text-3xl font-bold text-gray-400">:</Text>
-                          <View className="flex-1 text-center">
-                            <Text className="block text-4xl font-bold text-blue-600">
-                              {selectedMinute.toString().padStart(2, '0')}
-                            </Text>
-                            <Text className="block text-xs text-gray-500 mt-1">分</Text>
-                          </View>
-                        </View>
-                        <View className="flex items-center justify-center gap-2 mt-3">
-                          <Text className="block text-sm text-gray-500">
-                            每日 {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')} 发送AI分析报告
-                          </Text>
-                        </View>
-                      </View>
-                    </Picker>
-
-                    <View className="flex gap-2 mt-3">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => setNotificationsEnabled(false)}
-                      >
-                        <Text className="block text-xs">关闭</Text>
-                      </Button>
-                      <Button
-                        className="flex-1 bg-blue-500 text-white"
-                        onClick={confirmTimePicker}
-                      >
-                        <Text className="block text-xs">确定</Text>
-                      </Button>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
 
             {/* 分享按钮 */}
             {Object.keys(analysisResults).length > 0 && (
@@ -726,80 +588,12 @@ const SettingsPage = () => {
               </Button>
               <Button
                 className="flex-1 bg-blue-500 text-white"
-                onClick={startAnalysis}
+                onClick={handleBatchAnalyze}
                 disabled={isAnalyzing || selectedEvents.size === 0}
               >
                 <Text className="block text-sm">
                   {isAnalyzing ? '分析中...' : `开始分析 (${selectedEvents.size})`}
                 </Text>
-              </Button>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* 定时报告弹窗 */}
-      {showTimeDialog && (
-        <View
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
-          onClick={() => setShowTimeDialog(false)}
-        >
-          <View
-            className="bg-white rounded-t-2xl w-full p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <View className="flex items-center justify-between mb-4">
-              <Text className="block text-base font-bold text-gray-900">设置定时报告</Text>
-              <Bell size={20} strokeWidth={2} color="#3B82F6" />
-            </View>
-
-            {/* 苹果闹钟样式的时间选择器 */}
-            <Picker
-              mode="multiSelector"
-              range={[
-                Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}时`),
-                ['00分', '05分', '10分', '15分', '20分', '25分', '30分', '35分', '40分', '45分', '50分', '55分']
-              ]}
-              value={[selectedHour, Math.floor(selectedMinute / 5)]}
-              onChange={handleTimePickerChange}
-            >
-              <View className="bg-gray-50 rounded-lg p-6 border-2 border-gray-200 mb-4">
-                <View className="flex items-center justify-center gap-3">
-                  <View className="flex-1 text-center">
-                    <Text className="block text-5xl font-bold text-blue-600">
-                      {selectedHour.toString().padStart(2, '0')}
-                    </Text>
-                    <Text className="block text-sm text-gray-500 mt-2">时</Text>
-                  </View>
-                  <Text className="block text-4xl font-bold text-gray-400">:</Text>
-                  <View className="flex-1 text-center">
-                    <Text className="block text-5xl font-bold text-blue-600">
-                      {selectedMinute.toString().padStart(2, '0')}
-                    </Text>
-                    <Text className="block text-sm text-gray-500 mt-2">分</Text>
-                  </View>
-                </View>
-                <View className="flex items-center justify-center mt-4">
-                  <Text className="block text-base text-gray-600">
-                    每日 {selectedHour}:{selectedMinute.toString().padStart(2, '0')} 发送AI分析报告
-                  </Text>
-                </View>
-              </View>
-            </Picker>
-
-            <View className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowTimeDialog(false)}
-              >
-                <Text className="block text-sm">取消</Text>
-              </Button>
-              <Button
-                className="flex-1 bg-blue-500 text-white"
-                onClick={confirmTimePicker}
-              >
-                <Text className="block text-sm">确定</Text>
               </Button>
             </View>
           </View>

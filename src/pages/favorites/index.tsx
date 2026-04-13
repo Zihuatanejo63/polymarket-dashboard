@@ -146,8 +146,8 @@ const FavoritesPage = () => {
   }
 
   return (
-    <View className="min-h-screen bg-gray-50">
-      <ScrollView scrollY className="p-4" style={{ paddingBottom: '100px' }}>
+    <View className="h-screen bg-gray-50">
+      <ScrollView scrollY className="h-full p-4" style={{ paddingBottom: '100px' }}>
         {/* 标题 */}
         <View className="mb-4">
           <Text className="block text-xl font-bold text-gray-900">我的收藏</Text>
@@ -156,6 +156,21 @@ const FavoritesPage = () => {
           </Text>
         </View>
 
+        {/* 调试信息 */}
+        {false && (
+          <View className="mb-4 bg-gray-100 p-3 rounded-lg">
+            <Text className="block text-xs text-gray-600 mb-1">
+              调试信息：
+            </Text>
+            <Text className="block text-xs text-gray-600">
+              loading: {loading.toString()}
+            </Text>
+            <Text className="block text-xs text-gray-600">
+              favorites.length: {favorites.length}
+            </Text>
+          </View>
+        )}
+
         {/* 收藏列表 */}
         {loading ? (
           <View className="flex items-center justify-center py-8">
@@ -163,8 +178,8 @@ const FavoritesPage = () => {
           </View>
         ) : favorites.length === 0 ? (
           <View className="flex flex-col items-center justify-center py-12">
-            <Text className="block text-sm text-gray-500 mb-2">暂无收藏</Text>
-            <Text className="block text-xs text-gray-400">
+            <Text className="block text-base text-gray-600 mb-3">暂无收藏</Text>
+            <Text className="block text-sm text-gray-400 text-center">
               在首页点击星星图标收藏事件
             </Text>
           </View>
