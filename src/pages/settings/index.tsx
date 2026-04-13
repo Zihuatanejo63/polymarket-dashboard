@@ -26,6 +26,8 @@ const SettingsPage = () => {
   const [isImporting, setIsImporting] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [reportSchedule, setReportSchedule] = useState<string | null>(null)
+  const [showCustomTimeDialog, setShowCustomTimeDialog] = useState(false)
+  const [customTime, setCustomTime] = useState({ hour: 8, minute: 0 })
 
   useLoad(() => {
     checkLoginStatus()
@@ -195,6 +197,28 @@ const SettingsPage = () => {
     })
   }
 
+  const handleCustomTime = () => {
+    setShowCustomTimeDialog(true)
+  }
+
+  const confirmCustomTime = () => {
+    const schedule = `每日${customTime.hour}:${customTime.minute.toString().padStart(2, '0')}`
+    setReportSchedule(schedule)
+    setShowCustomTimeDialog(false)
+
+    // 调用后端设置定时任务
+    Network.request({
+      url: '/api/notification/schedule',
+      method: 'POST',
+      data: { schedule }
+    })
+
+    showToast({
+      title: `已设置每日 ${customTime.hour}:${customTime.minute.toString().padStart(2, '0')} 定时报告`,
+      icon: 'success'
+    })
+  }
+
   const handleShareAll = async () => {
     if (Object.keys(analysisResults).length === 0) {
       showToast({
@@ -273,7 +297,7 @@ const SettingsPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI 智能分析卡片 */}
+      {/* AI 智能分析卡片（整合定时报告和分享） */}
       <Card className="m-4">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -281,7 +305,7 @@ const SettingsPage = () => {
             <Text className="block">AI 智能分析</Text>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           {/* 一键导入收藏 */}
           <Button
             variant="outline"
@@ -310,8 +334,8 @@ const SettingsPage = () => {
 
           {/* 分析状态 */}
           {Object.keys(analysisResults).length > 0 && (
-            <View className="bg-blue-50 rounded-lg p-3 mt-2">
-              <View className="flex items-center justify-between">
+            <View className="bg-blue-50 rounded-lg p-3">
+              <View className="flex items-center justify-between mb-2">
                 <Text className="block text-xs text-gray-700">
                   已完成分析
                 </Text>
@@ -323,80 +347,89 @@ const SettingsPage = () => {
               </View>
             </View>
           )}
-        </CardContent>
-      </Card>
 
-      {/* 定时报告卡片 */}
-      <Card className="m-4">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Bell size={18} strokeWidth={2} color="#666" />
-            <Text className="block">定时 AI 报告</Text>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <View className="flex items-center justify-between">
-            <Text className="block text-sm text-gray-700">开启通知</Text>
-            <Switch
-              checked={notificationsEnabled}
-              onCheckedChange={(checked) => setNotificationsEnabled(checked)}
-            />
-          </View>
+          {/* 定时报告设置 */}
+          <View className="border-t border-gray-200 pt-4">
+            <View className="flex items-center justify-between mb-3">
+              <Text className="block text-sm font-semibold text-gray-700">
+                <Bell size={16} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+                定时 AI 报告
+              </Text>
+              <Switch
+                checked={notificationsEnabled}
+                onCheckedChange={(checked) => setNotificationsEnabled(checked)}
+              />
+            </View>
 
-          <View className="border-t border-gray-200 pt-3">
-            <Text className="block text-xs text-gray-500 mb-3">选择报告时间</Text>
-            <View className="space-y-2">
-              {['每日8:00', '每日12:00', '每日18:00', '每日20:00', '每周一9:00'].map((schedule) => (
+            {notificationsEnabled && (
+              <View className="space-y-2">
+                <Text className="block text-xs text-gray-500 mb-2">选择报告时间</Text>
+                <View className="grid grid-cols-2 gap-2">
+                  {['每日8:00', '每日12:00', '每日18:00', '每日20:00'].map((schedule) => (
+                    <View
+                      key={schedule}
+                      className={`rounded-lg p-3 border-2 text-center ${
+                        reportSchedule === schedule
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200'
+                      }`}
+                      onClick={() => handleSetSchedule(schedule)}
+                    >
+                      <Text
+                        className={`block text-xs ${
+                          reportSchedule === schedule
+                            ? 'text-blue-700 font-semibold'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        {schedule}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {/* 自定义时间 */}
                 <View
-                  key={schedule}
-                  className={`rounded-lg p-3 border-2 ${
-                    reportSchedule === schedule
+                  className={`rounded-lg p-3 border-2 text-center ${
+                    reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200'
                   }`}
-                  onClick={() => handleSetSchedule(schedule)}
+                  onClick={handleCustomTime}
                 >
-                  <View className="flex items-center justify-between">
-                    <Text
-                      className={`block text-sm ${
-                        reportSchedule === schedule
-                          ? 'text-blue-700 font-semibold'
-                          : 'text-gray-700'
-                      }`}
-                    >
-                      {schedule}
-                    </Text>
-                    {reportSchedule === schedule && (
-                      <View className="w-2 h-2 rounded-full bg-blue-500" />
-                    )}
-                  </View>
+                  <Text
+                    className={`block text-xs ${
+                      reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                        ? 'text-blue-700 font-semibold'
+                        : 'text-gray-700'
+                    }`}
+                  >
+                    {reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                      ? reportSchedule
+                      : '自定义时间'}
+                  </Text>
                 </View>
-              ))}
-            </View>
+              </View>
+            )}
           </View>
-        </CardContent>
-      </Card>
 
-      {/* 分享卡片 */}
-      <Card className="m-4">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Share2 size={18} strokeWidth={2} color="#666" />
-            <Text className="block">分享</Text>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2"
-            onClick={handleShareAll}
-            disabled={Object.keys(analysisResults).length === 0}
-          >
-            <Share2 size={18} strokeWidth={2} color="#666" />
-            <Text className="block text-sm">
-              一键分享所有分析
+          {/* 分享 */}
+          <View className="border-t border-gray-200 pt-4">
+            <Text className="block text-sm font-semibold text-gray-700 mb-3">
+              <Share2 size={16} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
+              分享
             </Text>
-          </Button>
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+              onClick={handleShareAll}
+              disabled={Object.keys(analysisResults).length === 0}
+            >
+              <Share2 size={18} strokeWidth={2} color="#666" />
+              <Text className="block text-sm">
+                一键分享所有分析
+              </Text>
+            </Button>
+          </View>
         </CardContent>
       </Card>
 
@@ -414,6 +447,94 @@ const SettingsPage = () => {
           </Text>
         </CardContent>
       </Card>
+
+      {/* 自定义时间选择弹窗 */}
+      {showCustomTimeDialog && (
+        <View
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
+          onClick={() => setShowCustomTimeDialog(false)}
+        >
+          <View
+            className="bg-white rounded-t-2xl w-full max-w-md p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <View className="flex items-center justify-between mb-4">
+              <Text className="block text-base font-bold text-gray-900">自定义时间</Text>
+              <Bell size={20} strokeWidth={2} color="#666" />
+            </View>
+
+            <View className="mb-4">
+              <Text className="block text-sm text-gray-700 mb-3">选择小时</Text>
+              <View className="grid grid-cols-6 gap-2">
+                {Array.from({ length: 24 }, (_, i) => (
+                  <View
+                    key={i}
+                    className={`rounded-lg p-2 text-center border-2 ${
+                      customTime.hour === i
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={() => setCustomTime({ ...customTime, hour: i })}
+                  >
+                    <Text
+                      className={`block text-xs ${
+                        customTime.hour === i
+                          ? 'text-blue-700 font-semibold'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {i.toString().padStart(2, '0')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View className="mb-4">
+              <Text className="block text-sm text-gray-700 mb-3">选择分钟</Text>
+              <View className="grid grid-cols-6 gap-2">
+                {Array.from({ length: 60 }, (_, i) => (
+                  <View
+                    key={i}
+                    className={`rounded-lg p-2 text-center border-2 ${
+                      customTime.minute === i
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={() => setCustomTime({ ...customTime, minute: i })}
+                  >
+                    <Text
+                      className={`block text-xs ${
+                        customTime.minute === i
+                          ? 'text-blue-700 font-semibold'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {i.toString().padStart(2, '0')}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View className="flex gap-3 mt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowCustomTimeDialog(false)}
+              >
+                <Text className="block text-sm">取消</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 text-white"
+                onClick={confirmCustomTime}
+              >
+                <Text className="block text-sm">确定</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
     </ScrollView>
   )
 }
