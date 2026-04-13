@@ -77,37 +77,45 @@ export class PolymarketService {
    */
   private async fetchFromAPI(): Promise<PolymarketEvent[]> {
     const sources = [
-      // Poly Market 官方 API（通过 Cloudflare 代理）
+      // 优先使用国内可访问的镜像
       {
-        name: 'poly-cloudflare',
-        url: 'https://poly-market-api.pages.dev/events',
-        timeout: 8000
+        name: 'github-mirror',
+        url: 'https://raw.githubusercontent.com/polymarket/polymarket-data/main/events.json',
+        timeout: 10000,
+        isDirect: true
       },
-      // Poly Market 官方 API（通过 GitHub Pages 代理）
       {
-        name: 'poly-github',
-        url: 'https://polymarket-proxy.vercel.app/events',
-        timeout: 10000
+        name: 'gitlab-mirror',
+        url: 'https://gitlab.com/api/v4/projects/polymarket%2Fpolymarket-data/repository/files/events.json/raw?ref=main',
+        timeout: 10000,
+        isDirect: true
       },
-      // CLOB API（Poly Market 后端）
+      {
+        name: 'jsdelivr-cdn',
+        url: 'https://cdn.jsdelivr.net/gh/polymarket/polymarket-data@main/events.json',
+        timeout: 10000,
+        isDirect: true
+      },
+      {
+        name: 'ghproxy-mirror',
+        url: 'https://ghproxy.com/https://raw.githubusercontent.com/polymarket/polymarket-data/main/events.json',
+        timeout: 10000,
+        isDirect: true
+      },
+      // Poly Market 官方 API（可能被墙，作为备用）
+      {
+        name: 'gamma-api',
+        url: 'https://gamma-api.polymarket.com/events?active=true&closed=false&limit=100',
+        timeout: 8000,
+        transform: 'gamma',
+        isDirect: false
+      },
       {
         name: 'clob-api',
         url: 'https://clob.polymarket.com/retrieve-markets',
         timeout: 10000,
-        transform: 'clob'
-      },
-      // 直接 API（可能被墙）
-      {
-        name: 'direct',
-        url: 'https://api.polymarket.com/events',
-        timeout: 5000
-      },
-      // The Graph API（Poly Market 子图）
-      {
-        name: 'thegraph',
-        url: 'https://api.thegraph.com/subgraphs/name/polymarket/polymarket-polygon',
-        timeout: 10000,
-        transform: 'graphql'
+        transform: 'clob',
+        isDirect: false
       }
     ]
 
@@ -118,37 +126,51 @@ export class PolymarketService {
         let response: any
         let events: any[] = []
 
-        if (source.transform === 'graphql') {
-          // GraphQL 查询
-          const query = `
-            query {
-              markets(
-                orderBy: volume,
-                orderDirection: desc,
-                first: 100,
-                where: { active: true }
-              ) {
-                id
-                question
-                outcomes
-                outcomePrices
-                liquidity
-                volume
-                slug
-                endDate
-              }
-            }
-          `
+        if (source.isDirect) {
+          // 直接获取JSON文件
           response = await lastValueFrom(
-            this.httpService.post(
-              source.url,
-              { query },
-              { timeout: source.timeout }
-            )
+            this.httpService.get(source.url, {
+              timeout: source.timeout,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+              }
+            })
           )
 
-          if (response.data?.data?.markets) {
-            events = response.data.data.markets
+          if (response.data) {
+            // 如果是数组，直接使用
+            if (Array.isArray(response.data)) {
+              events = response.data
+            }
+            // 如果是对象，尝试提取events字段
+            else if (response.data.events && Array.isArray(response.data.events)) {
+              events = response.data.events
+            }
+            // 如果是GitLab API，提取content字段并解码base64
+            else if (response.data.content) {
+              try {
+                const decodedContent = Buffer.from(response.data.content, 'base64').toString('utf-8')
+                events = JSON.parse(decodedContent)
+              } catch (e) {
+                console.error('GitLab content decode error:', e)
+              }
+            }
+          }
+        } else if (source.transform === 'gamma') {
+          // Gamma API
+          response = await lastValueFrom(
+            this.httpService.get(source.url, {
+              timeout: source.timeout,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json'
+              }
+            })
+          )
+
+          if (response.data && Array.isArray(response.data)) {
+            events = response.data
           }
         } else if (source.transform === 'clob') {
           // CLOB API
@@ -163,23 +185,6 @@ export class PolymarketService {
           if (response.data?.markets) {
             events = response.data.markets
           }
-        } else {
-          // 普通 GET 请求
-          response = await lastValueFrom(
-            this.httpService.get(source.url, {
-              timeout: source.timeout,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-              }
-            })
-          )
-
-          if (Array.isArray(response.data)) {
-            events = response.data
-          } else if (response.data?.data && Array.isArray(response.data.data)) {
-            events = response.data.data
-          }
         }
 
         if (events && events.length > 0) {
@@ -192,7 +197,7 @@ export class PolymarketService {
       }
     }
 
-    throw new Error('所有数据源都不可用，请检查网络连接或使用VPN')
+    throw new Error('所有数据源都不可用')
   }
 
   /**
