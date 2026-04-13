@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import { useLoad, usePullDownRefresh, stopPullDownRefresh, useShareAppMessage, showToast, navigateTo } from '@tarojs/taro'
+import { useLoad, usePullDownRefresh, stopPullDownRefresh, useShareAppMessage, showToast, navigateTo, useDidShow } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
@@ -49,6 +49,11 @@ const FavoritesPage = () => {
     loadFavorites()
   })
 
+  useDidShow(() => {
+    // 每次页面显示时重新加载收藏列表
+    loadFavorites()
+  })
+
   usePullDownRefresh(async () => {
     await loadFavorites()
     stopPullDownRefresh()
@@ -57,18 +62,31 @@ const FavoritesPage = () => {
   const loadFavorites = async () => {
     setLoading(true)
     try {
+      console.log('开始加载收藏列表...')
       const res = await Network.request({
         url: '/api/favorites'
       })
 
-      console.log('Favorites Response:', res.data)
+      console.log('Favorites raw response:', res)
+      console.log('Favorites res.data:', res.data)
+      console.log('Favorites res.data.code:', res.data?.code)
+      console.log('Favorites res.data.data:', res.data?.data)
 
       if (res.data?.code === 200) {
         const data = res.data.data || []
+        console.log('解析后的收藏数据:', data)
         console.log('Favorites count:', data.length)
         setFavorites(data)
+
+        if (data.length > 0) {
+          console.log('第一个收藏项:', data[0])
+        }
       } else {
         console.error('Invalid response code:', res.data?.code)
+        showToast({
+          title: '加载失败',
+          icon: 'none'
+        })
       }
     } catch (error) {
       console.error('加载收藏列表失败:', error)

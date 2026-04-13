@@ -180,13 +180,17 @@ const IndexPage = () => {
   const handleToggleFavorite = async (eventId: string) => {
     const isFavorited = favoritedIds.has(eventId)
 
+    console.log('开始收藏操作:', eventId, '当前状态:', isFavorited)
+
     try {
       if (isFavorited) {
         // 取消收藏
-        await Network.request({
+        console.log('取消收藏:', eventId)
+        const res = await Network.request({
           url: `/api/favorites/${eventId}`,
           method: 'DELETE'
         })
+        console.log('取消收藏响应:', res.data)
 
         setFavoritedIds(prev => {
           const newSet = new Set(prev)
@@ -200,11 +204,13 @@ const IndexPage = () => {
         })
       } else {
         // 添加收藏
-        await Network.request({
+        console.log('添加收藏:', eventId)
+        const res = await Network.request({
           url: '/api/favorites',
           method: 'POST',
           data: { eventId }
         })
+        console.log('添加收藏响应:', res.data)
 
         setFavoritedIds(prev => new Set([...prev, eventId]))
 
