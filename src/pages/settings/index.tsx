@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Sparkles, Share2, Download, LogIn, Bell } from 'lucide-react-taro'
+import { User, Sparkles, Share2, Download, LogIn, Bell, Check } from 'lucide-react-taro'
 import './index.config'
 
 interface AnalysisResult {
@@ -28,6 +28,12 @@ const SettingsPage = () => {
   const [reportSchedule, setReportSchedule] = useState<string | null>(null)
   const [showCustomTimeDialog, setShowCustomTimeDialog] = useState(false)
   const [customTime, setCustomTime] = useState({ hour: 8, minute: 0 })
+
+  // 弹窗状态
+  const [showImportDialog, setShowImportDialog] = useState(false)
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false)
+  const [allEvents, setAllEvents] = useState<any[]>([])
+  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set())
 
   useLoad(() => {
     checkLoginStatus()
@@ -124,12 +130,63 @@ const SettingsPage = () => {
   }
 
   const handleImportFavorites = async () => {
+    try {
+      // 获取所有可用事件
+      const res = await Network.request({
+        url: '/api/market/events',
+        data: { page: 1, pageSize: 50 }
+      })
+
+      if (res.data?.code === 200) {
+        setAllEvents(res.data.data.events || [])
+        // 初始化选中状态：已收藏的默认选中
+        const favoriteIds = new Set(favorites.map(f => f.id))
+        setSelectedEvents(favoriteIds)
+        setShowImportDialog(true)
+      }
+    } catch (error) {
+      console.error('加载事件失败:', error)
+      showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
+    }
+  }
+
+  const confirmImportFavorites = async () => {
     setIsImporting(true)
     try {
+      // 取消未选中的收藏
+      const currentFavoriteIds = new Set(favorites.map(f => f.id))
+      const toRemove = [...currentFavoriteIds].filter(id => !selectedEvents.has(id))
+
+      // 添加新选中的收藏
+      const toAdd = [...selectedEvents].filter(id => !currentFavoriteIds.has(id))
+
+      // 执行删除操作
+      for (const eventId of toRemove) {
+        await Network.request({
+          url: `/api/favorites/${eventId}`,
+          method: 'DELETE'
+        })
+      }
+
+      // 执行添加操作
+      for (const eventId of toAdd) {
+        await Network.request({
+          url: '/api/favorites',
+          method: 'POST',
+          data: { eventId }
+        })
+      }
+
+      // 重新加载收藏
       await loadFavorites()
 
+      setShowImportDialog(false)
+
       showToast({
-        title: `已导入 ${favorites.length} 个收藏`,
+        title: `已导入 ${selectedEvents.size} 个收藏`,
         icon: 'success'
       })
     } catch (error) {
@@ -143,7 +200,7 @@ const SettingsPage = () => {
     }
   }
 
-  const handleAnalyzeAll = async () => {
+  const handleAnalyzeAll = () => {
     if (favorites.length === 0) {
       showToast({
         title: '请先导入收藏',
@@ -152,9 +209,23 @@ const SettingsPage = () => {
       return
     }
 
+    // 初始化选中状态：默认全选
+    setSelectedEvents(new Set(favorites.map(f => f.id)))
+    setShowAnalysisDialog(true)
+  }
+
+  const startAnalysis = async () => {
+    if (selectedEvents.size === 0) {
+      showToast({
+        title: '请选择要分析的事件',
+        icon: 'none'
+      })
+      return
+    }
+
     setIsAnalyzing(true)
     try {
-      const eventIds = favorites.map(f => f.id)
+      const eventIds = Array.from(selectedEvents)
 
       const res = await Network.request({
         url: '/api/analysis/batch',
@@ -164,6 +235,7 @@ const SettingsPage = () => {
 
       if (res.data?.code === 200) {
         setAnalysisResults(res.data.data || {})
+        setShowAnalysisDialog(false)
 
         showToast({
           title: `已完成 ${eventIds.length} 个事件的分析`,
@@ -297,7 +369,7 @@ const SettingsPage = () => {
         </CardContent>
       </Card>
 
-      {/* AI 智能分析卡片（整合定时报告和分享） */}
+      {/* AI 智能分析卡片 */}
       <Card className="m-4">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -305,7 +377,7 @@ const SettingsPage = () => {
             <Text className="block">AI 智能分析</Text>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {/* 一键导入收藏 */}
           <Button
             variant="outline"
@@ -347,89 +419,6 @@ const SettingsPage = () => {
               </View>
             </View>
           )}
-
-          {/* 定时报告设置 */}
-          <View className="border-t border-gray-200 pt-4">
-            <View className="flex items-center justify-between mb-3">
-              <Text className="block text-sm font-semibold text-gray-700">
-                <Bell size={16} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
-                定时 AI 报告
-              </Text>
-              <Switch
-                checked={notificationsEnabled}
-                onCheckedChange={(checked) => setNotificationsEnabled(checked)}
-              />
-            </View>
-
-            {notificationsEnabled && (
-              <View className="space-y-2">
-                <Text className="block text-xs text-gray-500 mb-2">选择报告时间</Text>
-                <View className="grid grid-cols-2 gap-2">
-                  {['每日8:00', '每日12:00', '每日18:00', '每日20:00'].map((schedule) => (
-                    <View
-                      key={schedule}
-                      className={`rounded-lg p-3 border-2 text-center ${
-                        reportSchedule === schedule
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200'
-                      }`}
-                      onClick={() => handleSetSchedule(schedule)}
-                    >
-                      <Text
-                        className={`block text-xs ${
-                          reportSchedule === schedule
-                            ? 'text-blue-700 font-semibold'
-                            : 'text-gray-700'
-                        }`}
-                      >
-                        {schedule}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                {/* 自定义时间 */}
-                <View
-                  className={`rounded-lg p-3 border-2 text-center ${
-                    reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200'
-                  }`}
-                  onClick={handleCustomTime}
-                >
-                  <Text
-                    className={`block text-xs ${
-                      reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                        ? 'text-blue-700 font-semibold'
-                        : 'text-gray-700'
-                    }`}
-                  >
-                    {reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                      ? reportSchedule
-                      : '自定义时间'}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* 分享 */}
-          <View className="border-t border-gray-200 pt-4">
-            <Text className="block text-sm font-semibold text-gray-700 mb-3">
-              <Share2 size={16} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }} />
-              分享
-            </Text>
-            <Button
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
-              onClick={handleShareAll}
-              disabled={Object.keys(analysisResults).length === 0}
-            >
-              <Share2 size={18} strokeWidth={2} color="#666" />
-              <Text className="block text-sm">
-                一键分享所有分析
-              </Text>
-            </Button>
-          </View>
         </CardContent>
       </Card>
 
@@ -447,6 +436,274 @@ const SettingsPage = () => {
           </Text>
         </CardContent>
       </Card>
+
+      {/* 导入收藏弹窗 */}
+      {showImportDialog && (
+        <View
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
+          onClick={() => setShowImportDialog(false)}
+        >
+          <View
+            className="bg-white rounded-t-2xl w-full max-h-[70vh] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <View className="flex items-center justify-between mb-4">
+              <Text className="block text-base font-bold text-gray-900">选择要导入的收藏</Text>
+              <Download size={20} strokeWidth={2} color="#666" />
+            </View>
+
+            <ScrollView scrollY className="max-h-[50vh] mb-4">
+              <View className="space-y-2">
+                {allEvents.map((event) => (
+                  <View
+                    key={event.id}
+                    className={`rounded-lg p-3 border-2 ${
+                      selectedEvents.has(event.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={() => {
+                      setSelectedEvents(prev => {
+                        const newSet = new Set(prev)
+                        if (newSet.has(event.id)) {
+                          newSet.delete(event.id)
+                        } else {
+                          newSet.add(event.id)
+                        }
+                        return newSet
+                      })
+                    }}
+                  >
+                    <View className="flex items-start gap-3">
+                      <View
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          selectedEvents.has(event.id)
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {selectedEvents.has(event.id) && (
+                          <Check size={12} strokeWidth={3} color="#fff" />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className={`block text-sm font-medium mb-1 ${
+                            selectedEvents.has(event.id)
+                              ? 'text-blue-700'
+                              : 'text-gray-900'
+                          }`}
+                        >
+                          {event.question}
+                        </Text>
+                        <Text
+                          className={`block text-xs ${
+                            selectedEvents.has(event.id)
+                              ? 'text-blue-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {event.probability.toFixed(1)}% · {event.category}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            <View className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowImportDialog(false)}
+              >
+                <Text className="block text-sm">取消</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 text-white"
+                onClick={confirmImportFavorites}
+                disabled={isImporting}
+              >
+                <Text className="block text-sm">
+                  {isImporting ? '导入中...' : `确定 (${selectedEvents.size})`}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* AI分析功能弹窗 */}
+      {showAnalysisDialog && (
+        <View
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
+          onClick={() => setShowAnalysisDialog(false)}
+        >
+          <View
+            className="bg-white rounded-t-2xl w-full max-h-[80vh] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <View className="flex items-center justify-between mb-4">
+              <Text className="block text-base font-bold text-gray-900">AI 分析功能</Text>
+              <Sparkles size={20} strokeWidth={2} color="#3B82F6" />
+            </View>
+
+            {/* 事件选择 */}
+            <ScrollView scrollY className="max-h-[40vh] mb-4">
+              <View className="space-y-2">
+                {favorites.map((event) => (
+                  <View
+                    key={event.id}
+                    className={`rounded-lg p-3 border-2 ${
+                      selectedEvents.has(event.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={() => {
+                      setSelectedEvents(prev => {
+                        const newSet = new Set(prev)
+                        if (newSet.has(event.id)) {
+                          newSet.delete(event.id)
+                        } else {
+                          newSet.add(event.id)
+                        }
+                        return newSet
+                      })
+                    }}
+                  >
+                    <View className="flex items-start gap-3">
+                      <View
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          selectedEvents.has(event.id)
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {selectedEvents.has(event.id) && (
+                          <Check size={12} strokeWidth={3} color="#fff" />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className={`block text-sm font-medium mb-1 ${
+                            selectedEvents.has(event.id)
+                              ? 'text-blue-700'
+                              : 'text-gray-900'
+                          }`}
+                        >
+                          {event.question}
+                        </Text>
+                        <Text
+                          className={`block text-xs ${
+                            selectedEvents.has(event.id)
+                              ? 'text-blue-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {event.probability.toFixed(1)}% · {event.category}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* 定时报告设置 */}
+            <View className="border-t border-gray-200 pt-3 mb-3">
+              <View className="flex items-center justify-between mb-2">
+                <Text className="block text-sm font-semibold text-gray-700">
+                  <Bell size={14} strokeWidth={2} color="#666" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }} />
+                  定时报告
+                </Text>
+                <Switch
+                  checked={notificationsEnabled}
+                  onCheckedChange={(checked) => setNotificationsEnabled(checked)}
+                />
+              </View>
+
+              {notificationsEnabled && (
+                <View className="grid grid-cols-2 gap-2">
+                  {['每日8:00', '每日12:00', '每日18:00', '每日20:00'].map((schedule) => (
+                    <View
+                      key={schedule}
+                      className={`rounded-lg p-2 border-2 text-center ${
+                        reportSchedule === schedule
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200'
+                      }`}
+                      onClick={() => handleSetSchedule(schedule)}
+                    >
+                      <Text
+                        className={`block text-xs ${
+                          reportSchedule === schedule
+                            ? 'text-blue-700 font-semibold'
+                            : 'text-gray-700'
+                        }`}
+                      >
+                        {schedule}
+                      </Text>
+                    </View>
+                  ))}
+                  <View
+                    className={`rounded-lg p-2 border-2 text-center ${
+                      reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={handleCustomTime}
+                  >
+                    <Text
+                      className={`block text-xs ${
+                        reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                          ? 'text-blue-700 font-semibold'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                        ? reportSchedule
+                        : '自定义'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* 分享按钮 */}
+            {Object.keys(analysisResults).length > 0 && (
+              <Button
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2 mb-3"
+                onClick={handleShareAll}
+              >
+                <Share2 size={16} strokeWidth={2} color="#666" />
+                <Text className="block text-sm">分享分析结果</Text>
+              </Button>
+            )}
+
+            {/* 操作按钮 */}
+            <View className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowAnalysisDialog(false)}
+              >
+                <Text className="block text-sm">取消</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500 text-white"
+                onClick={startAnalysis}
+                disabled={isAnalyzing || selectedEvents.size === 0}
+              >
+                <Text className="block text-sm">
+                  {isAnalyzing ? '分析中...' : `开始分析 (${selectedEvents.size})`}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* 自定义时间选择弹窗 */}
       {showCustomTimeDialog && (
