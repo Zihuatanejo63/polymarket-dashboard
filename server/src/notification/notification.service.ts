@@ -1,76 +1,102 @@
 import { Injectable } from '@nestjs/common'
-import { MarketService } from '../market/market.service'
-import { FavoritesService } from '../favorites/favorites.service'
+
+interface ScheduledReport {
+  userId?: string
+  schedule: string
+  enabled: boolean
+  createTime: string
+}
+
+interface Alert {
+  eventId: string
+  threshold: number
+  currentValue: number
+  message: string
+  timestamp: string
+}
 
 @Injectable()
 export class NotificationService {
-  private static readonly ALERT_THRESHOLD = 5 // 波动阈值：5%
-
-  constructor(
-    private readonly marketService: MarketService,
-    private readonly favoritesService: FavoritesService,
-  ) {}
+  private scheduledReports: Map<string, ScheduledReport> = new Map()
+  private alerts: Map<string, Alert[]> = new Map()
 
   /**
-   * 检查收藏事件是否有显著波动
-   * 返回需要提醒的事件列表
+   * 设置定时报告
    */
-  async checkFavoriteAlerts(userId: string = 'default_user'): Promise<Array<{
-    eventId: string
-    question: string
-    oldProbability: number
-    newProbability: number
-    changePercentage: number
-  }>> {
-    const alerts: Array<{
-      eventId: string
-      question: string
-      oldProbability: number
-      newProbability: number
-      changePercentage: number
-    }> = []
-
-    // 获取用户的收藏列表
-    const favorites = await this.favoritesService.getUserFavorites(userId)
-
-    // 获取最新市场数据
-    const markets = await this.marketService.getMarkets()
-    const { safeEvents } = this.marketService.filterMarkets(markets)
-
-    // 对比每个收藏事件
-    for (const favorite of favorites) {
-      const latestEvent = safeEvents.find(e => e.id === favorite.id)
-
-      if (latestEvent) {
-        const changePercentage = Math.abs(latestEvent.probability - favorite.probability)
-
-        // 如果波动超过阈值，添加到提醒列表
-        if (changePercentage >= NotificationService.ALERT_THRESHOLD) {
-          alerts.push({
-            eventId: latestEvent.id,
-            question: latestEvent.question,
-            oldProbability: favorite.probability,
-            newProbability: latestEvent.probability,
-            changePercentage
-          })
-        }
-      }
+  async setSchedule(schedule: string, userId?: string): Promise<ScheduledReport> {
+    const report: ScheduledReport = {
+      userId,
+      schedule,
+      enabled: true,
+      createTime: new Date().toISOString(),
     }
 
-    return alerts
+    const key = userId || 'default'
+    this.scheduledReports.set(key, report)
+
+    console.log('设置定时报告:', report)
+
+    // TODO: 实现实际的定时任务调度
+    // 可以使用 @nestjs/schedule 模块
+
+    return report
   }
 
   /**
-   * 获取提醒通知摘要
+   * 获取定时报告设置
    */
-  async getNotificationSummary(userId: string = 'default_user') {
-    const alerts = await this.checkFavoriteAlerts(userId)
+  async getSchedule(userId?: string): Promise<ScheduledReport | null> {
+    const key = userId || 'default'
+    return this.scheduledReports.get(key) || null
+  }
+
+  /**
+   * 取消定时报告
+   */
+  async cancelSchedule(userId?: string): Promise<boolean> {
+    const key = userId || 'default'
+    const deleted = this.scheduledReports.delete(key)
+    return deleted
+  }
+
+  /**
+   * 发送波动提醒通知
+   */
+  async sendNotification(userId: string, eventId: string, message: string): Promise<{ sent: boolean }> {
+    console.log(`发送通知给用户 ${userId}，事件 ${eventId}：${message}`)
+
+    // TODO: 实现实际的通知发送逻辑
+    // 可以使用微信订阅消息模板
+
+    return { sent: true }
+  }
+
+  /**
+   * 批量发送通知
+   */
+  async sendBatchNotifications(userId: string, eventIds: string[]): Promise<{ sentCount: number }> {
+    let sentCount = 0
+
+    for (const eventId of eventIds) {
+      await this.sendNotification(userId, eventId, `事件 ${eventId} 发生波动`)
+      sentCount++
+    }
+
+    return { sentCount }
+  }
+
+  /**
+   * 获取通知摘要
+   */
+  async getNotificationSummary(userId: string): Promise<{
+    totalAlerts: number
+    alerts: Alert[]
+  }> {
+    const userAlerts = this.alerts.get(userId) || []
 
     return {
-      hasAlerts: alerts.length > 0,
-      count: alerts.length,
-      alerts,
-      timestamp: new Date().toISOString()
+      totalAlerts: userAlerts.length,
+      alerts: userAlerts
     }
   }
 }

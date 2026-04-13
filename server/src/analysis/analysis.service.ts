@@ -8,6 +8,7 @@ import { LLMClient, Config } from 'coze-coding-dev-sdk'
 @Injectable()
 export class AnalysisService {
   private llmClient: LLMClient
+  private analysisResults: Map<string, any> = new Map()
 
   constructor(
     private httpService: HttpService,
@@ -87,11 +88,42 @@ export class AnalysisService {
       // 解析 JSON 响应
       const analysisResult = this.parseJSONResponse(llmResponse.content)
 
+      // 保存分析结果
+      this.analysisResults.set(eventId, analysisResult)
+
       return analysisResult
     } catch (error) {
       console.error('分析失败:', error)
       throw new Error('分析失败，请稍后重试')
     }
+  }
+
+  /**
+   * 批量分析事件
+   */
+  async batchAnalyzeEvents(eventIds: string[]): Promise<Record<string, any>> {
+    const results: Record<string, any> = {}
+
+    for (const eventId of eventIds) {
+      try {
+        const result = await this.analyzeEvent(eventId)
+        results[eventId] = result
+
+        // 添加延迟，避免API限流
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      } catch (error) {
+        results[eventId] = { error: '分析失败' }
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * 获取所有分析结果
+   */
+  async getAllAnalysisResults(): Promise<Record<string, any>> {
+    return Object.fromEntries(this.analysisResults)
   }
 
   /**
