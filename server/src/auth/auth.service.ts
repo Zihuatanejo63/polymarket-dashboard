@@ -11,17 +11,15 @@ interface WechatLoginResponse {
   errmsg?: string
 }
 
-interface UserInfo {
-  userId: string
-  openid: string
-  nickName?: string
-  avatarUrl?: string
-  createTime: string
-}
-
 @Injectable()
 export class AuthService {
-  private users: Map<string, UserInfo> = new Map()
+  private users: Map<string, {
+    userId: string
+    openid: string
+    nickName?: string
+    avatarUrl?: string
+    createTime: string
+  }> = new Map()
 
   constructor(
     private httpService: HttpService,
@@ -31,7 +29,13 @@ export class AuthService {
   /**
    * 微信登录
    */
-  async wechatLogin(code: string): Promise<UserInfo> {
+  async wechatLogin(code: string): Promise<{
+    userId: string
+    openid: string
+    nickName?: string
+    avatarUrl?: string
+    createTime: string
+  }> {
     try {
       // 获取微信配置
       const appId = this.configService.get<string>('WECHAT_APP_ID') || 'your_appid'
@@ -77,14 +81,26 @@ export class AuthService {
   /**
    * 获取用户信息
    */
-  async getUserInfo(userId: string): Promise<UserInfo | null> {
+  async getUserInfo(userId: string): Promise<{
+    userId: string
+    openid: string
+    nickName?: string
+    avatarUrl?: string
+    createTime: string
+  } | null> {
     return this.users.get(userId) || null
   }
 
   /**
    * 根据openid查找用户
    */
-  private findUserByOpenid(openid: string): UserInfo | null {
+  private findUserByOpenid(openid: string): {
+    userId: string
+    openid: string
+    nickName?: string
+    avatarUrl?: string
+    createTime: string
+  } | null {
     for (const user of this.users.values()) {
       if (user.openid === openid) {
         return user

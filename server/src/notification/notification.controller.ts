@@ -1,6 +1,26 @@
 import { Controller, Post, Body, Get, Delete } from '@nestjs/common'
 import { NotificationService } from './notification.service'
 
+interface ScheduledReport {
+  userId?: string
+  schedule: string
+  enabled: boolean
+  createTime: string
+}
+
+interface Alert {
+  eventId: string
+  threshold: number
+  currentValue: number
+  message: string
+  timestamp: string
+}
+
+interface NotificationSummary {
+  totalAlerts: number
+  alerts: Alert[]
+}
+
 @Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
@@ -85,7 +105,7 @@ export class NotificationController {
    * GET /api/notification/alerts
    */
   @Get('alerts')
-  async getAlerts() {
+  async getAlerts(): Promise<{ code: number; msg: string; data: NotificationSummary }> {
     // TODO: 从 JWT 或 session 中获取用户 ID
     const userId = 'default_user'
 

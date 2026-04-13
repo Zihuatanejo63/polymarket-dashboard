@@ -1,30 +1,32 @@
 import { Injectable } from '@nestjs/common'
 
-interface ScheduledReport {
-  userId?: string
-  schedule: string
-  enabled: boolean
-  createTime: string
-}
-
-interface Alert {
-  eventId: string
-  threshold: number
-  currentValue: number
-  message: string
-  timestamp: string
-}
-
 @Injectable()
 export class NotificationService {
-  private scheduledReports: Map<string, ScheduledReport> = new Map()
-  private alerts: Map<string, Alert[]> = new Map()
+  private scheduledReports: Map<string, {
+    userId?: string
+    schedule: string
+    enabled: boolean
+    createTime: string
+  }> = new Map()
+
+  private alerts: Map<string, Array<{
+    eventId: string
+    threshold: number
+    currentValue: number
+    message: string
+    timestamp: string
+  }>> = new Map()
 
   /**
    * 设置定时报告
    */
-  async setSchedule(schedule: string, userId?: string): Promise<ScheduledReport> {
-    const report: ScheduledReport = {
+  async setSchedule(schedule: string, userId?: string): Promise<{
+    userId?: string
+    schedule: string
+    enabled: boolean
+    createTime: string
+  }> {
+    const report = {
       userId,
       schedule,
       enabled: true,
@@ -45,7 +47,12 @@ export class NotificationService {
   /**
    * 获取定时报告设置
    */
-  async getSchedule(userId?: string): Promise<ScheduledReport | null> {
+  async getSchedule(userId?: string): Promise<{
+    userId?: string
+    schedule: string
+    enabled: boolean
+    createTime: string
+  } | null> {
     const key = userId || 'default'
     return this.scheduledReports.get(key) || null
   }
@@ -90,7 +97,13 @@ export class NotificationService {
    */
   async getNotificationSummary(userId: string): Promise<{
     totalAlerts: number
-    alerts: Alert[]
+    alerts: Array<{
+      eventId: string
+      threshold: number
+      currentValue: number
+      message: string
+      timestamp: string
+    }>
   }> {
     const userAlerts = this.alerts.get(userId) || []
 

@@ -1,6 +1,14 @@
 import { Controller, Post, Body, Get } from '@nestjs/common'
 import { AuthService } from './auth.service'
 
+interface UserInfo {
+  userId: string
+  openid: string
+  nickName?: string
+  avatarUrl?: string
+  createTime: string
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
