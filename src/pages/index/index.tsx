@@ -1,5 +1,5 @@
 import { View, Text, ScrollView } from '@tarojs/components'
-import { useLoad, usePullDownRefresh, useReachBottom, showToast, stopPullDownRefresh } from '@tarojs/taro'
+import Taro, { useLoad, usePullDownRefresh, useReachBottom, stopPullDownRefresh } from '@tarojs/taro'
 import { useState, useEffect } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
@@ -19,17 +19,29 @@ interface MarketEvent {
   change24h: number
 }
 
+interface PaginationInfo {
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 const IndexPage = () => {
   const [events, setEvents] = useState<MarketEvent[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('全部')
   const [hasMore, setHasMore] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null)
+  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
 
   const categories = ['全部', '热榜', '金融', '体育', '科技']
 
   useLoad(() => {
     loadEvents()
+    loadFavoritedIds()
+    checkNotifications()
   })
 
   usePullDownRefresh(async () => {
@@ -38,12 +50,14 @@ const IndexPage = () => {
   })
 
   useReachBottom(() => {
-    if (!loading && hasMore) {
+    if (!loading && hasMore && pagination && pagination.page < pagination.totalPages) {
       loadMore()
     }
   })
 
   useEffect(() => {
+    setCurrentPage(1)
+    setEvents([])
     loadEvents()
   }, [selectedCategory])
 
@@ -53,7 +67,9 @@ const IndexPage = () => {
       const res = await Network.request({
         url: '/api/market/events',
         data: {
-          category: selectedCategory === '全部' ? 'all' : selectedCategory
+          category: selectedCategory === '全部' ? 'all' : selectedCategory,
+          page: currentPage,
+          pageSize: 10
         }
       })
 
@@ -61,11 +77,14 @@ const IndexPage = () => {
 
       if (res.data?.code === 200) {
         setEvents(res.data.data || [])
-        setHasMore(false) // 模拟数据有限
+        setPagination(res.data.pagination || null)
+        setHasMore(
+          res.data.pagination ? res.data.pagination.page < res.data.pagination.totalPages : false
+        )
       }
     } catch (error) {
       console.error('加载失败:', error)
-      showToast({
+      Taro.showToast({
         title: '加载失败',
         icon: 'none'
       })
@@ -75,8 +94,117 @@ const IndexPage = () => {
   }
 
   const loadMore = async () => {
-    // TODO: 实现分页加载
-    console.log('加载更多')
+    try {
+      setLoading(true)
+      const nextPage = currentPage + 1
+      const res = await Network.request({
+        url: '/api/market/events',
+        data: {
+          category: selectedCategory === '全部' ? 'all' : selectedCategory,
+          page: nextPage,
+          pageSize: 10
+        }
+      })
+
+      console.log('Load More Response:', res.data)
+
+      if (res.data?.code === 200) {
+        setEvents([...events, ...(res.data.data || [])])
+        setCurrentPage(nextPage)
+        setPagination(res.data.pagination || null)
+        setHasMore(
+          res.data.pagination ? res.data.pagination.page < res.data.pagination.totalPages : false
+        )
+      }
+    } catch (error) {
+      console.error('加载更多失败:', error)
+      Taro.showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadFavoritedIds = async () => {
+    try {
+      const res = await Network.request({
+        url: '/api/favorites'
+      })
+
+      if (res.data?.code === 200) {
+        const ids = new Set(res.data.data.map((e: MarketEvent) => e.id)) as Set<string>
+        setFavoritedIds(ids)
+      }
+    } catch (error) {
+      console.error('加载收藏列表失败:', error)
+    }
+  }
+
+  const checkNotifications = async () => {
+    try {
+      const res = await Network.request({
+        url: '/api/notification/alerts'
+      })
+
+      if (res.data?.code === 200 && res.data.data?.hasAlerts) {
+        const { count, alerts } = res.data.data
+        Taro.showToast({
+          title: `发现 ${count} 个事件有显著波动`,
+          icon: 'none',
+          duration: 3000
+        })
+        console.log('波动提醒:', alerts)
+      }
+    } catch (error) {
+      console.error('检查通知失败:', error)
+    }
+  }
+
+  const handleToggleFavorite = async (eventId: string) => {
+    const isFavorited = favoritedIds.has(eventId)
+
+    try {
+      if (isFavorited) {
+        // 取消收藏
+        await Network.request({
+          url: `/api/favorites/${eventId}`,
+          method: 'DELETE'
+        })
+
+        setFavoritedIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(eventId)
+          return newSet
+        })
+
+        Taro.showToast({
+          title: '已取消收藏',
+          icon: 'success'
+        })
+      } else {
+        // 添加收藏
+        await Network.request({
+          url: '/api/favorites',
+          method: 'POST',
+          data: { eventId }
+        })
+
+        setFavoritedIds(prev => new Set([...prev, eventId]))
+
+        Taro.showToast({
+          title: '收藏成功',
+          icon: 'success'
+        })
+      }
+    } catch (error) {
+      console.error('收藏操作失败:', error)
+      Taro.showToast({
+        title: '操作失败',
+        icon: 'none'
+      })
+    }
   }
 
   const getCategoryColor = (category: string) => {
@@ -198,6 +326,7 @@ const IndexPage = () => {
               <Card
                 key={event.id}
                 className="bg-white rounded-2xl shadow-sm overflow-hidden"
+                onClick={() => Taro.navigateTo({ url: `/pages/detail/index?id=${event.id}` })}
               >
                 <CardContent className="p-4">
                   {/* 分类标签和收藏按钮 */}
@@ -216,7 +345,12 @@ const IndexPage = () => {
                           {Math.abs(event.change24h).toFixed(1)}%
                         </Text>
                       )}
-                      <Star size={20} color="#999" />
+                      <Star
+                        size={20}
+                        color={favoritedIds.has(event.id) ? '#FFD700' : '#999'}
+                        strokeWidth={favoritedIds.has(event.id) ? 3 : 2}
+                        onClick={() => handleToggleFavorite(event.id)}
+                      />
                     </View>
                   </View>
 

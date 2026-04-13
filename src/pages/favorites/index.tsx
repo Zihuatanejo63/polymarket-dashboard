@@ -1,6 +1,7 @@
-import { View, Text } from '@tarojs/components'
-import { useLoad, usePullDownRefresh, stopPullDownRefresh } from '@tarojs/taro'
+import { View, Text, ScrollView } from '@tarojs/components'
+import Taro, { useLoad, usePullDownRefresh, stopPullDownRefresh } from '@tarojs/taro'
 import { useState } from 'react'
+import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Star } from 'lucide-react-taro'
@@ -33,10 +34,48 @@ const FavoritesPage = () => {
 
   const loadFavorites = async () => {
     setLoading(true)
-    // TODO: 从后端加载收藏列表
-    // 目前使用模拟数据
-    setFavorites([])
-    setLoading(false)
+    try {
+      const res = await Network.request({
+        url: '/api/favorites'
+      })
+
+      console.log('Favorites Response:', res.data)
+
+      if (res.data?.code === 200) {
+        setFavorites(res.data.data || [])
+      }
+    } catch (error) {
+      console.error('加载收藏列表失败:', error)
+      Taro.showToast({
+        title: '加载失败',
+        icon: 'none'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRemoveFavorite = async (eventId: string) => {
+    try {
+      await Network.request({
+        url: `/api/favorites/${eventId}`,
+        method: 'DELETE'
+      })
+
+      // 更新本地列表
+      setFavorites(prev => prev.filter(e => e.id !== eventId))
+
+      Taro.showToast({
+        title: '已取消收藏',
+        icon: 'success'
+      })
+    } catch (error) {
+      console.error('取消收藏失败:', error)
+      Taro.showToast({
+        title: '操作失败',
+        icon: 'none'
+      })
+    }
   }
 
   const getProbabilityColor = (probability: number) => {
@@ -85,7 +124,11 @@ const FavoritesPage = () => {
       </View>
 
       {/* 收藏列表 */}
-      <View className="p-4 space-y-3">
+      <ScrollView
+        scrollY
+        className="flex-1 px-4 py-3"
+        style={{ height: 'calc(100vh - 60px)' }}
+      >
         {loading ? (
           <View className="py-8 space-y-3">
             {[1, 2, 3].map((i) => (
@@ -98,7 +141,7 @@ const FavoritesPage = () => {
           </View>
         ) : favorites.length === 0 ? (
           <View className="flex flex-col items-center justify-center py-20">
-            <Star size={48} color="#ddd" className="mb-4" />
+            <Star size={48} color="#ddd" strokeWidth={2} className="mb-4" />
             <Text className="block text-center text-gray-500 text-sm mb-2">
               暂无收藏
             </Text>
@@ -107,62 +150,70 @@ const FavoritesPage = () => {
             </Text>
           </View>
         ) : (
-          favorites.map((event) => (
-            <Card
-              key={event.id}
-              className="bg-white rounded-2xl shadow-sm overflow-hidden"
-            >
-              <CardContent className="p-4">
-                {/* 分类标签和收藏按钮 */}
-                <View className="flex items-center justify-between mb-3">
-                  <Badge className={getCategoryColor(event.category)}>
-                    <Text className="block text-xs">{event.category}</Text>
-                  </Badge>
-                  <Star size={20} color="#FFD700" strokeWidth={3} />
-                </View>
+          <View className="space-y-3">
+            {favorites.map((event) => (
+              <Card
+                key={event.id}
+                className="bg-white rounded-2xl shadow-sm overflow-hidden"
+                onClick={() => Taro.navigateTo({ url: `/pages/detail/index?id=${event.id}` })}
+              >
+                <CardContent className="p-4">
+                  {/* 分类标签和收藏按钮 */}
+                  <View className="flex items-center justify-between mb-3">
+                    <Badge className={getCategoryColor(event.category)}>
+                      <Text className="block text-xs">{event.category}</Text>
+                    </Badge>
+                    <Star
+                      size={20}
+                      color="#FFD700"
+                      strokeWidth={3}
+                      onClick={() => handleRemoveFavorite(event.id)}
+                    />
+                  </View>
 
-                {/* 问题文本 */}
-                <Text className="block text-sm text-gray-900 mb-4 line-clamp-2 leading-relaxed">
-                  {event.question}
-                </Text>
+                  {/* 问题文本 */}
+                  <Text className="block text-sm text-gray-900 mb-4 line-clamp-2 leading-relaxed">
+                    {event.question}
+                  </Text>
 
-                {/* 概率进度条 */}
-                <View className="mb-3">
-                  <View className="flex items-center justify-between mb-2">
-                    <Text
-                      className="block text-sm font-semibold"
-                      style={{ color: getProbabilityColor(event.probability) }}
-                    >
-                      {getProbabilityLabel(event.probability)}
-                    </Text>
-                    <Text
-                      className="block text-lg font-bold"
-                      style={{ color: getProbabilityColor(event.probability) }}
-                    >
-                      {event.probability.toFixed(1)}%
+                  {/* 概率进度条 */}
+                  <View className="mb-3">
+                    <View className="flex items-center justify-between mb-2">
+                      <Text
+                        className="block text-sm font-semibold"
+                        style={{ color: getProbabilityColor(event.probability) }}
+                      >
+                        {getProbabilityLabel(event.probability)}
+                      </Text>
+                      <Text
+                        className="block text-lg font-bold"
+                        style={{ color: getProbabilityColor(event.probability) }}
+                      >
+                        {event.probability.toFixed(1)}%
+                      </Text>
+                    </View>
+                    <Progress
+                      value={event.probability}
+                      className="h-2"
+                      style={{
+                        '--progress-background': getProbabilityColor(event.probability)
+                      } as any}
+                    />
+                  </View>
+
+                  {/* 底部信息 */}
+                  <View className="flex items-center gap-4 text-xs text-gray-500">
+                    <Text className="block">${event.price.toFixed(3)}</Text>
+                    <Text className="block">
+                      24h量 {formatNumber(event.volume24h)}
                     </Text>
                   </View>
-                  <Progress
-                    value={event.probability}
-                    className="h-2"
-                    style={{
-                      '--progress-background': getProbabilityColor(event.probability)
-                    } as any}
-                  />
-                </View>
-
-                {/* 底部信息 */}
-                <View className="flex items-center gap-4 text-xs text-gray-500">
-                  <Text className="block">${event.price.toFixed(3)}</Text>
-                  <Text className="block">
-                    24h量 {formatNumber(event.volume24h)}
-                  </Text>
-                </View>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))}
+          </View>
         )}
-      </View>
+      </ScrollView>
     </View>
   )
 }
