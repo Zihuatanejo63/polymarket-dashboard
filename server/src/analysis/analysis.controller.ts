@@ -6,30 +6,7 @@ export class AnalysisController {
   constructor(private readonly analysisService: AnalysisService) {}
 
   /**
-   * 分析事件的概率意义
-   * POST /api/analysis/:eventId
-   */
-  @Post(':eventId')
-  async analyzeEvent(@Param('eventId') eventId: string) {
-    try {
-      const result = await this.analysisService.analyzeEvent(eventId)
-
-      return {
-        code: 200,
-        msg: 'success',
-        data: result
-      }
-    } catch (error) {
-      return {
-        code: 500,
-        msg: error.message || '分析失败',
-        data: null
-      }
-    }
-  }
-
-  /**
-   * 批量分析事件
+   * 批量分析事件（必须放在 :eventId 路由之前）
    * POST /api/analysis/batch
    */
   @Post('batch')
@@ -56,6 +33,29 @@ export class AnalysisController {
       return {
         code: 500,
         msg: error.message || '批量分析失败',
+        data: null
+      }
+    }
+  }
+
+  /**
+   * 分析事件的概率意义
+   * POST /api/analysis/:eventId
+   */
+  @Post(':eventId')
+  async analyzeEvent(@Param('eventId') eventId: string) {
+    try {
+      const result = await this.analysisService.analyzeEvent(eventId)
+
+      return {
+        code: 200,
+        msg: 'success',
+        data: result
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        msg: error.message || '分析失败',
         data: null
       }
     }

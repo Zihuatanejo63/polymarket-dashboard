@@ -102,7 +102,7 @@ export class MarketService {
    * 获取模拟数据（用于测试）
    */
   private getMockData(): MarketEvent[] {
-    return [
+    const mockEvents = [
       // 金融类
       {
         id: '1',
@@ -184,6 +184,76 @@ export class MarketService {
         category: '金融',
         change24h: 1.3
       },
+      {
+        id: '23',
+        question: '以太坊将在 2025 年突破 5000 美元吗？',
+        probability: 55.8,
+        price: 0.558,
+        volume24h: 3200000,
+        liquidity: 8900000,
+        category: '金融',
+        change24h: 7.5
+      },
+      {
+        id: '24',
+        question: '狗狗币将在 2025 年重新达到 1 美元吗？',
+        probability: 18.2,
+        price: 0.182,
+        volume24h: 890000,
+        liquidity: 2100000,
+        category: '金融',
+        change24h: -5.8
+      },
+      {
+        id: '25',
+        question: '美国 10 年期国债收益率将在 2025 年突破 5% 吗？',
+        probability: 42.7,
+        price: 0.427,
+        volume24h: 560000,
+        liquidity: 1780000,
+        category: '金融',
+        change24h: 3.2
+      },
+      {
+        id: '26',
+        question: '美国住房价格将在 2025 年下跌 10% 吗？',
+        probability: 31.5,
+        price: 0.315,
+        volume24h: 450000,
+        liquidity: 1340000,
+        category: '金融',
+        change24h: -4.1
+      },
+      {
+        id: '27',
+        question: '全球 M2 货币供应量将在 2025 年下降吗？',
+        probability: 22.3,
+        price: 0.223,
+        volume24h: 280000,
+        liquidity: 890000,
+        category: '金融',
+        change24h: 1.8
+      },
+      {
+        id: '28',
+        question: '石油价格将在 2025 年突破 100 美元吗？',
+        probability: 48.6,
+        price: 0.486,
+        volume24h: 1800000,
+        liquidity: 5600000,
+        category: '金融',
+        change24h: 8.9
+      },
+      {
+        id: '29',
+        question: '日元兑美元汇率将在 2025 年突破 150 吗？',
+        probability: 38.4,
+        price: 0.384,
+        volume24h: 670000,
+        liquidity: 2100000,
+        category: '金融',
+        change24h: -2.6
+      },
 
       // 体育类
       {
@@ -235,6 +305,66 @@ export class MarketService {
         liquidity: 3200000,
         category: '体育',
         change24h: 3.2
+      },
+      {
+        id: '30',
+        question: 'C罗将在 2025 年退役吗？',
+        probability: 45.8,
+        price: 0.458,
+        volume24h: 980000,
+        liquidity: 3200000,
+        category: '体育',
+        change24h: 12.3
+      },
+      {
+        id: '31',
+        question: '2025 年欧洲杯冠军会是法国队吗？',
+        probability: 28.5,
+        price: 0.285,
+        volume24h: 650000,
+        liquidity: 2100000,
+        category: '体育',
+        change24h: -3.8
+      },
+      {
+        id: '32',
+        question: 'F1 2025 赛季总冠军会是维斯塔潘吗？',
+        probability: 52.3,
+        price: 0.523,
+        volume24h: 780000,
+        liquidity: 2450000,
+        category: '体育',
+        change24h: 5.6
+      },
+      {
+        id: '33',
+        question: '中国女排将在 2025 年奥运会夺金吗？',
+        probability: 38.6,
+        price: 0.386,
+        volume24h: 560000,
+        liquidity: 1780000,
+        category: '体育',
+        change24h: 4.2
+      },
+      {
+        id: '34',
+        question: '2025 年中超联赛冠军会是上海海港吗？',
+        probability: 35.2,
+        price: 0.352,
+        volume24h: 320000,
+        liquidity: 980000,
+        category: '体育',
+        change24h: -1.5
+      },
+      {
+        id: '35',
+        question: '纳达尔将在 2025 年复出并赢下大满贯吗？',
+        probability: 18.7,
+        price: 0.187,
+        volume24h: 450000,
+        liquidity: 1340000,
+        category: '体育',
+        change24h: -8.2
       },
 
       // 科技类
@@ -298,6 +428,86 @@ export class MarketService {
         category: '科技',
         change24h: 7.2
       },
+      {
+        id: '36',
+        question: '苹果 Vision Pro 将在 2025 年推出更便宜的版本吗？',
+        probability: 58.4,
+        price: 0.584,
+        volume24h: 890000,
+        liquidity: 2670000,
+        category: '科技',
+        change24h: 9.3
+      },
+      {
+        id: '37',
+        question: '谷歌将在 2025 年发布完全自动驾驶出租车服务吗？',
+        probability: 42.6,
+        price: 0.426,
+        volume24h: 670000,
+        liquidity: 1980000,
+        category: '科技',
+        change24h: 5.8
+      },
+      {
+        id: '38',
+        question: 'Meta 将在 2025 年推出消费级 AR 眼镜吗？',
+        probability: 32.1,
+        price: 0.321,
+        volume24h: 560000,
+        liquidity: 1750000,
+        category: '科技',
+        change24h: 3.5
+      },
+      {
+        id: '39',
+        question: '亚马逊将在 2025 年推出家用机器人吗？',
+        probability: 28.7,
+        price: 0.287,
+        volume24h: 450000,
+        liquidity: 1340000,
+        category: '科技',
+        change24h: 2.1
+      },
+      {
+        id: '40',
+        question: '字节跳动将在 2025 年上市吗？',
+        probability: 45.2,
+        price: 0.452,
+        volume24h: 1200000,
+        liquidity: 4500000,
+        category: '科技',
+        change24h: 11.2
+      },
+      {
+        id: '41',
+        question: '英伟达将在 2025 年推出新一代 Blackwell+ 显卡吗？',
+        probability: 62.3,
+        price: 0.623,
+        volume24h: 2100000,
+        liquidity: 6800000,
+        category: '科技',
+        change24h: 7.8
+      },
+      {
+        id: '42',
+        question: '5G 网络将在 2025 年被 6G 取代吗？',
+        probability: 15.8,
+        price: 0.158,
+        volume24h: 320000,
+        liquidity: 890000,
+        category: '科技',
+        change24h: -3.2
+      },
+      {
+        id: '43',
+        question: '微软将在 2025 年发布 Windows 12 吗？',
+        probability: 72.5,
+        price: 0.725,
+        volume24h: 1450000,
+        liquidity: 4200000,
+        category: '科技',
+        change24h: 4.6
+      },
 
       // 其他
       {
@@ -329,8 +539,80 @@ export class MarketService {
         liquidity: 980000,
         category: '其他',
         change24h: -3.6
+      },
+      {
+        id: '44',
+        question: 'ChatGPT 将在 2025 年实现真正的人工通用智能吗？',
+        probability: 15.2,
+        price: 0.152,
+        volume24h: 890000,
+        liquidity: 2100000,
+        category: '其他',
+        change24h: -5.3
+      },
+      {
+        id: '45',
+        question: '2025 年会爆发新的全球流行病吗？',
+        probability: 12.5,
+        price: 0.125,
+        volume24h: 670000,
+        liquidity: 1980000,
+        category: '其他',
+        change24h: -8.7
+      },
+      {
+        id: '46',
+        question: '电动汽车将在 2025 年超过燃油车销量吗？',
+        probability: 52.3,
+        price: 0.523,
+        volume24h: 1780000,
+        liquidity: 5600000,
+        category: '其他',
+        change24h: 8.2
+      },
+      {
+        id: '47',
+        question: '可再生能源将在 2025 年超过化石能源占比吗？',
+        probability: 38.6,
+        price: 0.386,
+        volume24h: 890000,
+        liquidity: 2670000,
+        category: '其他',
+        change24h: 6.5
+      },
+      {
+        id: '48',
+        question: '2025 年会出现新的物种大灭绝事件吗？',
+        probability: 5.8,
+        price: 0.058,
+        volume24h: 450000,
+        liquidity: 1340000,
+        category: '其他',
+        change24h: -2.1
+      },
+      {
+        id: '49',
+        question: '人类将在 2025 年发现外星文明吗？',
+        probability: 3.2,
+        price: 0.032,
+        volume24h: 780000,
+        liquidity: 2100000,
+        category: '其他',
+        change24h: 1.5
+      },
+      {
+        id: '50',
+        question: '2025 年会出现通用脑机接口设备吗？',
+        probability: 18.7,
+        price: 0.187,
+        volume24h: 560000,
+        liquidity: 1750000,
+        category: '其他',
+        change24h: 4.8
       }
     ]
+
+    return mockEvents
   }
 
   /**
