@@ -6,14 +6,15 @@ export class MarketController {
   constructor(private readonly marketService: MarketService) {}
 
   /**
-   * 获取市场事件列表（支持分页）
-   * GET /api/market/events?category=all&page=1&pageSize=20
+   * 获取市场事件列表（支持分页和排序）
+   * GET /api/market/events?category=all&page=1&pageSize=20&sort=probability_desc
    */
   @Get('events')
   async getEvents(
     @Query('category') category?: string,
     @Query('page') page: string = '1',
-    @Query('pageSize') pageSize: string = '20'
+    @Query('pageSize') pageSize: string = '20',
+    @Query('sort') sort?: string
   ) {
     const pageNum = parseInt(page, 10) || 1
     const pageSizeNum = parseInt(pageSize, 10) || 20
@@ -24,8 +25,12 @@ export class MarketController {
     // 2. 敏感词过滤
     const { safeEvents } = this.marketService.filterMarkets(events)
 
-    // 3. 分类筛选
-    const filteredEvents = this.marketService.filterByCategory(safeEvents, category)
+    // 3. 分类筛选 + 排序
+    const filteredEvents = this.marketService.filterByCategory(
+      safeEvents,
+      category,
+      sort
+    )
 
     // 4. 分页
     const paginatedResult = this.marketService.getPaginatedEvents(

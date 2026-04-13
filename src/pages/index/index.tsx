@@ -31,12 +31,19 @@ const IndexPage = () => {
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('全部')
+  const [selectedSort, setSelectedSort] = useState('probability_desc')
   const [hasMore, setHasMore] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
 
-  const categories = ['全部', '热榜', '金融', '体育', '科技']
+  const categories = ['全部', '热榜', '金融', '体育', '科技', '其他']
+  const sortOptions = [
+    { value: 'probability_desc', label: '概率从高到低' },
+    { value: 'probability_asc', label: '概率从低到高' },
+    { value: 'volume_desc', label: '热榜排名' },
+    { value: 'change_desc', label: '波动最大' }
+  ]
 
   useLoad(() => {
     loadEvents()
@@ -59,7 +66,7 @@ const IndexPage = () => {
     setCurrentPage(1)
     setEvents([])
     loadEvents()
-  }, [selectedCategory])
+  }, [selectedCategory, selectedSort])
 
   const loadEvents = async () => {
     try {
@@ -69,7 +76,8 @@ const IndexPage = () => {
         data: {
           category: selectedCategory === '全部' ? 'all' : selectedCategory,
           page: currentPage,
-          pageSize: 10
+          pageSize: 10,
+          sort: selectedSort
         }
       })
 
@@ -102,7 +110,8 @@ const IndexPage = () => {
         data: {
           category: selectedCategory === '全部' ? 'all' : selectedCategory,
           page: nextPage,
-          pageSize: 10
+          pageSize: 10,
+          sort: selectedSort
         }
       })
 
@@ -275,28 +284,52 @@ const IndexPage = () => {
         </View>
       </View>
 
-      {/* 分类标签 */}
-      <ScrollView
-        scrollX
-        className="bg-white border-b border-gray-200"
-        showScrollbar={false}
-      >
-        <View className="flex flex-row px-4 py-3 gap-2">
-          {categories.map((cat) => (
-            <View
-              key={cat}
-              className={`px-4 py-2 rounded-full text-sm ${
-                selectedCategory === cat
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              <Text className="block">{cat}</Text>
+      {/* 分类标签和排序 */}
+      <View className="bg-white border-b border-gray-200">
+        <ScrollView
+          scrollX
+          className="px-4 py-3"
+          showScrollbar={false}
+        >
+          <View className="flex flex-row gap-2">
+            {categories.map((cat) => (
+              <View
+                key={cat}
+                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${
+                  selectedCategory === cat
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                <Text className="block">{cat}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* 排序选择器 */}
+        {selectedCategory === '全部' && (
+          <View className="px-4 pb-3 flex items-center gap-2">
+            <Text className="block text-xs text-gray-500">排序：</Text>
+            <View className="flex flex-row gap-2 flex-wrap">
+              {sortOptions.map((opt) => (
+                <View
+                  key={opt.value}
+                  className={`px-3 py-1 rounded text-xs ${
+                    selectedSort === opt.value
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                  onClick={() => setSelectedSort(opt.value)}
+                >
+                  <Text className="block">{opt.label}</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      </ScrollView>
+          </View>
+        )}
+      </View>
 
       {/* 事件列表 */}
       <ScrollView
