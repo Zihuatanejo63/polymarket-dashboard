@@ -1,4 +1,4 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Picker } from '@tarojs/components'
 import Taro, { useLoad, showToast } from '@tarojs/taro'
 import { useState } from 'react'
 import { Network } from '@/network'
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, Sparkles, Share2, Download, LogIn, Bell, Check } from 'lucide-react-taro'
+import { User, Sparkles, Share2, Download, LogIn, Bell, Check, Clock } from 'lucide-react-taro'
 import './index.config'
 
 interface AnalysisResult {
@@ -26,8 +26,9 @@ const SettingsPage = () => {
   const [isImporting, setIsImporting] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [reportSchedule, setReportSchedule] = useState<string | null>(null)
-  const [showCustomTimeDialog, setShowCustomTimeDialog] = useState(false)
-  const [customTime, setCustomTime] = useState({ hour: 8, minute: 0 })
+  const [showTimePicker, setShowTimePicker] = useState(false)
+  const [selectedHour, setSelectedHour] = useState(8)
+  const [selectedMinute, setSelectedMinute] = useState(0)
 
   // 弹窗状态
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -268,14 +269,16 @@ const SettingsPage = () => {
     })
   }
 
-  const handleCustomTime = () => {
-    setShowCustomTimeDialog(true)
+  const handleTimePickerChange = (e: any) => {
+    const { value } = e.detail
+    setSelectedHour(value[0])
+    setSelectedMinute(value[1])
   }
 
-  const confirmCustomTime = () => {
-    const schedule = `每日${customTime.hour}:${customTime.minute.toString().padStart(2, '0')}`
+  const confirmTimePicker = () => {
+    const schedule = `每日${selectedHour}:${selectedMinute.toString().padStart(2, '0')}`
     setReportSchedule(schedule)
-    setShowCustomTimeDialog(false)
+    setShowTimePicker(false)
 
     // 调用后端设置定时任务
     Network.request({
@@ -285,7 +288,7 @@ const SettingsPage = () => {
     })
 
     showToast({
-      title: `已设置每日 ${customTime.hour}:${customTime.minute.toString().padStart(2, '0')} 定时报告`,
+      title: `已设置每日 ${selectedHour}:${selectedMinute.toString().padStart(2, '0')} 定时报告`,
       icon: 'success'
     })
   }
@@ -623,47 +626,100 @@ const SettingsPage = () => {
               </View>
 
               {notificationsEnabled && (
-                <View className="grid grid-cols-2 gap-2">
-                  {['每日8:00', '每日12:00', '每日18:00', '每日20:00'].map((schedule) => (
+                <View>
+                  {/* 快捷时间选择 */}
+                  <View className="grid grid-cols-2 gap-2 mb-3">
+                    {['每日8:00', '每日12:00', '每日18:00', '每日20:00'].map((schedule) => (
+                      <View
+                        key={schedule}
+                        className={`rounded-lg p-2 border-2 text-center ${
+                          reportSchedule === schedule
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200'
+                        }`}
+                        onClick={() => handleSetSchedule(schedule)}
+                      >
+                        <Text
+                          className={`block text-xs ${
+                            reportSchedule === schedule
+                              ? 'text-blue-700 font-semibold'
+                              : 'text-gray-700'
+                          }`}
+                        >
+                          {schedule}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* 滚轮时间选择器 */}
+                  <View className="bg-gray-50 rounded-lg p-3 border-2 border-gray-200">
+                    <Text className="block text-xs text-gray-600 mb-2">
+                      自定义时间（点击选择）
+                    </Text>
                     <View
-                      key={schedule}
-                      className={`rounded-lg p-2 border-2 text-center ${
-                        reportSchedule === schedule
+                      className={`rounded-lg p-3 border-2 text-center cursor-pointer ${
+                        reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200'
                       }`}
-                      onClick={() => handleSetSchedule(schedule)}
+                      onClick={() => setShowTimePicker(true)}
                     >
+                      <Clock
+                        size={16}
+                        strokeWidth={2}
+                        color={reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule) ? '#3B82F6' : '#666'}
+                        style={{ display: 'inline', verticalAlign: 'middle', marginRight: '6px' }}
+                      />
                       <Text
-                        className={`block text-xs ${
-                          reportSchedule === schedule
+                        className={`text-sm ${
+                          reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
                             ? 'text-blue-700 font-semibold'
                             : 'text-gray-700'
                         }`}
                       >
-                        {schedule}
+                        {reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
+                          ? reportSchedule.replace('每日', '')
+                          : '选择时间'}
                       </Text>
                     </View>
-                  ))}
-                  <View
-                    className={`rounded-lg p-2 border-2 text-center ${
-                      reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
-                    onClick={handleCustomTime}
-                  >
-                    <Text
-                      className={`block text-xs ${
-                        reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                          ? 'text-blue-700 font-semibold'
-                          : 'text-gray-700'
-                      }`}
-                    >
-                      {reportSchedule?.startsWith('每日') && !['每日8:00', '每日12:00', '每日18:00', '每日20:00'].includes(reportSchedule)
-                        ? reportSchedule
-                        : '自定义'}
-                    </Text>
+
+                    {/* 时间选择器 */}
+                    {showTimePicker && (
+                      <View className="mt-3">
+                        <Picker
+                          mode="multiSelector"
+                          range={[
+                            Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}`),
+                            Array.from({ length: 60 }, (_, i) => `${i.toString().padStart(2, '0')}`)
+                          ]}
+                          value={[selectedHour, selectedMinute]}
+                          onChange={handleTimePickerChange}
+                        >
+                          <View className="bg-white rounded-lg p-3 border border-gray-200">
+                            <Text className="block text-sm text-gray-700 text-center">
+                              当前选择：{selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
+                            </Text>
+                          </View>
+                        </Picker>
+
+                        <View className="flex gap-2 mt-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setShowTimePicker(false)}
+                          >
+                            <Text className="block text-xs">取消</Text>
+                          </Button>
+                          <Button
+                            className="flex-1 bg-blue-500 text-white"
+                            onClick={confirmTimePicker}
+                          >
+                            <Text className="block text-xs">确定</Text>
+                          </Button>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
               )}
@@ -698,94 +754,6 @@ const SettingsPage = () => {
                 <Text className="block text-sm">
                   {isAnalyzing ? '分析中...' : `开始分析 (${selectedEvents.size})`}
                 </Text>
-              </Button>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* 自定义时间选择弹窗 */}
-      {showCustomTimeDialog && (
-        <View
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
-          onClick={() => setShowCustomTimeDialog(false)}
-        >
-          <View
-            className="bg-white rounded-t-2xl w-full max-w-md p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <View className="flex items-center justify-between mb-4">
-              <Text className="block text-base font-bold text-gray-900">自定义时间</Text>
-              <Bell size={20} strokeWidth={2} color="#666" />
-            </View>
-
-            <View className="mb-4">
-              <Text className="block text-sm text-gray-700 mb-3">选择小时</Text>
-              <View className="grid grid-cols-6 gap-2">
-                {Array.from({ length: 24 }, (_, i) => (
-                  <View
-                    key={i}
-                    className={`rounded-lg p-2 text-center border-2 ${
-                      customTime.hour === i
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
-                    onClick={() => setCustomTime({ ...customTime, hour: i })}
-                  >
-                    <Text
-                      className={`block text-xs ${
-                        customTime.hour === i
-                          ? 'text-blue-700 font-semibold'
-                          : 'text-gray-700'
-                      }`}
-                    >
-                      {i.toString().padStart(2, '0')}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View className="mb-4">
-              <Text className="block text-sm text-gray-700 mb-3">选择分钟</Text>
-              <View className="grid grid-cols-6 gap-2">
-                {Array.from({ length: 60 }, (_, i) => (
-                  <View
-                    key={i}
-                    className={`rounded-lg p-2 text-center border-2 ${
-                      customTime.minute === i
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200'
-                    }`}
-                    onClick={() => setCustomTime({ ...customTime, minute: i })}
-                  >
-                    <Text
-                      className={`block text-xs ${
-                        customTime.minute === i
-                          ? 'text-blue-700 font-semibold'
-                          : 'text-gray-700'
-                      }`}
-                    >
-                      {i.toString().padStart(2, '0')}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <View className="flex gap-3 mt-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowCustomTimeDialog(false)}
-              >
-                <Text className="block text-sm">取消</Text>
-              </Button>
-              <Button
-                className="flex-1 bg-blue-500 text-white"
-                onClick={confirmCustomTime}
-              >
-                <Text className="block text-sm">确定</Text>
               </Button>
             </View>
           </View>

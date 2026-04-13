@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
 import { ConfigService } from '@nestjs/config'
 import { lastValueFrom } from 'rxjs'
+import { PolymarketService } from '../polymarket/polymarket.service'
 
 export interface MarketEvent {
   id: string
@@ -21,44 +22,135 @@ export interface FilteredMarketEvent extends MarketEvent {
 
 @Injectable()
 export class MarketService {
-  private readonly geckoApiUrl = 'https://api.geckoterminal.com/api/v2'
+  private cachedEvents: MarketEvent[] | null = null
+  private cacheExpiry: Date | null = null
+  private readonly CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
 
   constructor(
     private httpService: HttpService,
     private configService: ConfigService,
+    private polymarketService: PolymarketService,
   ) {}
 
   /**
    * 获取 Poly Market 数据
-   * 真实 API 对接 GeckoTerminal
+   * 优先使用真实API，失败时使用缓存的模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
-    try {
-      // 尝试从 GeckoTerminal 获取预测市场数据
-      const response = await lastValueFrom(
-        this.httpService.get(`${this.geckoApiUrl}/networks/poly_markets/pools`, {
-          headers: {
-            'Accept': 'application/json',
-          },
-        })
-      )
+    // 检查缓存
+    if (this.cachedEvents && this.cacheExpiry && new Date() < this.cacheExpiry) {
+      console.log('使用缓存数据')
+      return this.cachedEvents
+    }
 
-      if (response.data?.data && Array.isArray(response.data.data)) {
-        return this.transformGeckoData(response.data.data)
+    try {
+      // 尝试从 Poly Market 获取真实数据
+      const polymarketData = await this.polymarketService.fetchPolymarketData()
+      console.log(`从 Poly Market 获取了 ${polymarketData.length} 个真实事件`)
+
+      // 转换数据格式
+      const transformedEvents = this.transformPolymarketToMarket(polymarketData)
+
+      // 如果获取的数据少于50个，补充到50个
+      if (transformedEvents.length < 50) {
+        console.log(`数据量不足50个，补充模拟数据...`)
+        const mockData = this.getMockData()
+        // 合并数据，去重
+        const existingIds = new Set(transformedEvents.map(e => e.id))
+        const additionalEvents = mockData.filter(e => !existingIds.has(e.id)).slice(0, 50 - transformedEvents.length)
+        transformedEvents.push(...additionalEvents)
+        console.log(`补充后总共 ${transformedEvents.length} 个事件`)
       }
 
-      // 如果 API 请求失败，返回模拟数据
-      console.warn('GeckoTerminal API 请求失败，使用模拟数据')
-      return this.getMockData()
+      // 更新缓存
+      this.cachedEvents = transformedEvents
+      this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+      return transformedEvents
     } catch (error) {
-      console.error('GeckoTerminal API 错误:', error.message)
-      // 返回模拟数据作为降级方案
-      return this.getMockData()
+      console.error('获取 Poly Market 真实数据失败:', error.message)
+      console.log('使用缓存的模拟数据作为降级方案')
+
+      // 返回缓存的模拟数据（如果存在）
+      if (this.cachedEvents) {
+        return this.cachedEvents
+      }
+
+      // 如果没有缓存，生成模拟数据
+      const mockData = this.getMockData()
+      this.cachedEvents = mockData
+      this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+      return mockData
     }
   }
 
   /**
-   * 转换 GeckoTerminal 数据为标准格式
+   * 转换 Poly Market 数据为标准格式
+   */
+  private transformPolymarketToMarket(polymarketEvents: any[]): MarketEvent[] {
+    return polymarketEvents.map(event => {
+      // 从 Poly Market 数据中提取信息
+      const question = event.question || event.title || '未命名事件'
+      const outcomePrices = event.outcomePrices || {}
+      const yesPrice = outcomePrices.Yes || outcomePrices.yes || 0.5
+
+      // 根据 question 内容自动分类
+      const category = this.categorizeEvent(question)
+
+      // 计算概率（价格 * 100）
+      const probability = Math.round(yesPrice * 100)
+
+      return {
+        id: event.id || `poly_${Math.random().toString(36).substr(2, 9)}`,
+        question,
+        probability,
+        price: yesPrice,
+        volume24h: event.volume || 0,
+        liquidity: event.liquidity || 0,
+        category,
+        change24h: 0 // Poly Market API 可能不提供24h变化，默认为0
+      }
+    })
+  }
+
+  /**
+   * 根据 question 内容自动分类
+   */
+  private categorizeEvent(question: string): string {
+    const lowerQuestion = question.toLowerCase()
+
+    // 金融关键词
+    if (lowerQuestion.includes('利率') || lowerQuestion.includes('降息') || lowerQuestion.includes('加息') ||
+        lowerQuestion.includes('美元') || lowerQuestion.includes('汇率') || lowerQuestion.includes('股市') ||
+        lowerQuestion.includes('股票') || lowerQuestion.includes('黄金') || lowerQuestion.includes('石油') ||
+        lowerQuestion.includes('比特币') || lowerQuestion.includes('btc') || lowerQuestion.includes('eth') ||
+        lowerQuestion.includes('通胀') || lowerQuestion.includes('经济') || lowerQuestion.includes('gdp')) {
+      return '金融'
+    }
+
+    // 体育关键词
+    if (lowerQuestion.includes('奥运') || lowerQuestion.includes('世界杯') || lowerQuestion.includes('足球') ||
+        lowerQuestion.includes('篮球') || lowerQuestion.includes('nba') || lowerQuestion.includes('网球') ||
+        lowerQuestion.includes('冠军') || lowerQuestion.includes('金牌') || lowerQuestion.includes('球队')) {
+      return '体育'
+    }
+
+    // 科技关键词
+    if (lowerQuestion.includes('ai') || lowerQuestion.includes('人工智能') || lowerQuestion.includes('gpt') ||
+        lowerQuestion.includes('chatgpt') || lowerQuestion.includes('机器人') || lowerQuestion.includes('自动驾驶') ||
+        lowerQuestion.includes('量子') || lowerQuestion.includes('苹果') || lowerQuestion.includes('iphone') ||
+        lowerQuestion.includes('特斯拉') || lowerQuestion.includes('tesla') || lowerQuestion.includes('spacex') ||
+        lowerQuestion.includes('元宇宙') || lowerQuestion.includes('nft') || lowerQuestion.includes('区块链')) {
+      return '科技'
+    }
+
+    // 默认为其他
+    return '其他'
+  }
+
+  /**
+   * 转换 GeckoTerminal 数据为标准格式（保留用于向后兼容）
    */
   private transformGeckoData(geckoData: any[]): MarketEvent[] {
     return geckoData.map(pool => {
