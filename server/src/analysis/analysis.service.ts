@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { MarketService } from '../market/market.service'
+import { OssSyncService } from '../oss-sync/oss-sync.service'
 import { LLMClient, Config } from 'coze-coding-dev-sdk'
 
 @Injectable()
@@ -12,7 +12,7 @@ export class AnalysisService {
 
   constructor(
     private httpService: HttpService,
-    private marketService: MarketService,
+    private ossSyncService: OssSyncService,
     private configService: ConfigService,
   ) {
     // 初始化 LLM 客户端
@@ -34,13 +34,23 @@ export class AnalysisService {
     try {
       console.log(`[AI分析] 开始分析事件: ${eventId}`)
 
-      // 获取事件详情
-      const eventDetail = await this.marketService.getEventDetail(eventId)
+      // 从OSS获取事件详情
+      const events = this.ossSyncService.getMarkets()
+      const eventDetail = events.find((e: any) => e.id === eventId)
+
+      if (!eventDetail) {
+        throw new Error(`事件 ${eventId} 不存在`)
+      }
+
       console.log(`[AI分析] 事件详情:`, {
         question: eventDetail.question,
         probability: eventDetail.probability,
-        category: eventDetail.category
+        category: eventDetail.tags?.[0] || '其他'
       })
+
+      // 获取标签
+      const tag = eventDetail.tags?.[0]
+      const tagLabel = typeof tag === 'object' ? tag?.label : tag
 
       // 构建 AI 分析提示词
       const systemPrompt = `你是一位专业的预测市场分析师，擅长分析预测事件与现实世界的联系。
@@ -52,10 +62,9 @@ export class AnalysisService {
 
 事件问题：${eventDetail.question}
 当前概率：${eventDetail.probability}%
-24h 波动：${eventDetail.change24h}%
-分类：${eventDetail.category}
-当前价格：$${eventDetail.price}
-24小时交易量：$${(eventDetail.volume24h / 1000000).toFixed(1)}M
+分类：${tagLabel || '其他'}
+24小时交易量：$${((eventDetail.volume || 0) / 1000000).toFixed(1)}M
+流动性：$${((eventDetail.liquidity || 0) / 1000000).toFixed(1)}M
 
 请从以下角度进行深度分析：
 
@@ -176,11 +185,17 @@ export class AnalysisService {
     impactScenarios: string[]
   }> {
     try {
-      const eventDetail = await this.marketService.getEventDetail(eventId)
+      // 从OSS获取事件详情
+      const markets = this.ossSyncService.getMarkets()
+      const eventDetail = markets.find((e: any) => e.id === eventId)
+
+      if (!eventDetail) {
+        throw new Error(`事件 ${eventId} 不存在`)
+      }
 
       // 根据概率和分类生成模板化分析
-      const probability = eventDetail.probability
-      const category = eventDetail.category
+      const probability = eventDetail.probabilityRaw || eventDetail.probability || 50
+      const category = eventDetail.categoryZh || '其他'
       const question = eventDetail.question
 
       // 判断概率区间

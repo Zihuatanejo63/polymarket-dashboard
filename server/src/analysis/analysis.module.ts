@@ -3,10 +3,10 @@ import { HttpModule } from '@nestjs/axios'
 import { ConfigModule } from '@nestjs/config'
 import { AnalysisService } from './analysis.service'
 import { AnalysisController } from './analysis.controller'
-import { MarketModule } from '../market/market.module'
+import { OssSyncModule } from '../oss-sync/oss-sync.module'
 
 @Module({
-  imports: [HttpModule, ConfigModule, MarketModule],
+  imports: [HttpModule, ConfigModule, OssSyncModule],
   controllers: [AnalysisController],
   providers: [AnalysisService],
   exports: [AnalysisService],

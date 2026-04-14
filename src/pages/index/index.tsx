@@ -79,40 +79,21 @@ const IndexPage = () => {
       console.log('OSS API Response:', res.data)
 
       if (res.data?.code === 200) {
-        // 转换OSS数据格式为前端格式
+        // 直接使用后端返回的翻译后数据
         const rawMarkets = res.data.data || []
         const formattedEvents = rawMarkets.map((m: any) => {
-          // 获取标签
-          const tag = m.tags?.[0]
-          const tagLabel = typeof tag === 'object' ? tag?.label : tag
-
-          // 标准化分类
-          let category = '其他'
-          if (tagLabel) {
-            const lowerTag = tagLabel.toLowerCase()
-            if (lowerTag.includes('finance') || lowerTag.includes('crypto') || lowerTag.includes('bitcoin')) {
-              category = '金融'
-            } else if (lowerTag.includes('sport') || lowerTag.includes('nba') || lowerTag.includes('football')) {
-              category = '体育'
-            } else if (lowerTag.includes('tech') || lowerTag.includes('science')) {
-              category = '科技'
-            } else if (lowerTag.includes('politics') || lowerTag.includes('election')) {
-              category = '政治'
-            } else if (lowerTag.includes('entertainment')) {
-              category = '娱乐'
-            } else {
-              category = tagLabel
-            }
-          }
+          // 使用后端已翻译的中文分类
+          const category = m.categoryZh || '其他'
 
           return {
             id: m.id,
             question: m.question,
-            probability: Number(m.probability),
+            probability: Number(m.probabilityRaw || m.probability),
             price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
             volume24h: Number(m.volume),
             liquidity: Number(m.liquidity),
             category,
+            categoryRaw: m.tags?.[0]?.label || m.tags?.[0] || '',
             change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10
           }
         })

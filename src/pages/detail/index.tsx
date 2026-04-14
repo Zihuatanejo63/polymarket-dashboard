@@ -73,17 +73,17 @@ const DetailPage = () => {
 
       if (res.data?.code === 200) {
         const m = res.data.data
-        // 转换数据格式
+        // 使用后端返回的翻译后数据
         const formattedEvent: MarketEvent = {
           id: m.id,
           question: m.question,
-          probability: Number(m.probability),
+          probability: Number(m.probabilityRaw || m.probability),
           price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
           volume24h: Number(m.volume),
           liquidity: Number(m.liquidity),
-          category: m.tags?.[0]?.label || m.tags?.[0] || '其他',
+          category: m.categoryZh || m.tags?.[0]?.label || m.tags?.[0] || '其他',
           change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10,
-          history7Days: generateHistory7Days(Number(m.probability))
+          history7Days: generateHistory7Days(Number(m.probabilityRaw || m.probability))
         }
         setEvent(formattedEvent)
       }

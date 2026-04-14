@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
+import { translateCategory, formatProbability, formatVolume } from '../common/translation'
 
 export interface PolymarketData {
   markets: any[]
@@ -39,6 +40,33 @@ export class OssSyncService {
     setInterval(() => {
       this.loadDataFromCOS()
     }, this.CACHE_DURATION)
+  }
+
+  /**
+   * 翻译并格式化市场数据
+   */
+  private formatMarket(market: any): any {
+    // 获取原始标签
+    const rawTag = market.tags?.[0]
+    const tagLabel = typeof rawTag === 'object' ? rawTag?.label : rawTag
+
+    // 翻译分类
+    const categoryZh = translateCategory(tagLabel || '')
+
+    // 获取概率
+    const probability = parseFloat(market.outcomePrices?.[1]) || market.probability || 50
+    const probabilityNum = typeof probability === 'string' ? parseFloat(probability) : probability
+
+    return {
+      ...market,
+      // 添加中文分类
+      categoryZh,
+      // 添加格式化字段
+      probabilityZh: formatProbability(probabilityNum * 100),
+      probabilityRaw: probabilityNum * 100,
+      volumeZh: formatVolume(market.volume),
+      liquidityZh: formatVolume(market.liquidity),
+    }
   }
 
   /**
@@ -82,17 +110,18 @@ export class OssSyncService {
   }
 
   /**
-   * 获取市场数据（从缓存）
+   * 获取市场数据（从缓存，包含翻译）
    */
   getMarkets(): any[] {
-    return this.cachedData?.markets || []
+    return (this.cachedData?.markets || []).map(m => this.formatMarket(m))
   }
 
   /**
-   * 获取单个市场
+   * 获取单个市场（包含翻译）
    */
   getMarketById(id: string): any | null {
-    return this.cachedData?.markets.find(m => m.id === id) || null
+    const market = this.cachedData?.markets.find(m => m.id === id)
+    return market ? this.formatMarket(market) : null
   }
 
   /**

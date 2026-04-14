@@ -148,13 +148,22 @@ const SettingsPage = () => {
 
   const handleImportFavorites = async () => {
     try {
-      // 获取所有可用事件（手动构建query参数）
+      // 使用OSS端点获取所有可用事件
       const res = await Network.request({
-        url: '/api/market/events?page=1&pageSize=50'
+        url: '/api/polymarket-oss/markets'
       })
 
       if (res.data?.code === 200) {
-        setAllEvents(res.data.data.events || [])
+        // 转换OSS数据格式
+        const rawMarkets = res.data.data || []
+        const allEventsData = rawMarkets.map((m: any) => ({
+          id: m.id,
+          question: m.question,
+          probability: Number(m.probability),
+          category: m.tags?.[0]?.label || m.tags?.[0] || '其他'
+        }))
+
+        setAllEvents(allEventsData)
         // 初始化选中状态：已收藏的默认选中
         const favoriteIds = new Set(favorites.map(f => f.id))
         setSelectedEvents(favoriteIds)
