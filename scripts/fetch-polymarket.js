@@ -10,18 +10,22 @@ const COS_CONFIG = {
   region: process.env.COS_REGION
 };
 
-// Coze API配置（使用已配置的COZE_API_KEY）
-const COZE_API_KEY = process.env.COZE_API_KEY;
-const COZE_API_URL = 'https://api.coze.cn/open_api/v2/chat';
-
-/**
- * 调用豆包API批量翻译
- * @param {string[]} texts 要翻译的英文文本数组
- * @returns {Promise<string[]>} 中文翻译数组
- */
 /**
  * 使用增强本地翻译（无需API）
  */
+async function translateWithDoubao(texts) {
+  console.log(`🔄 使用本地增强翻译 ${texts.length} 条文本...`);
+  return texts.map(enhancedTranslate);
+}
+
+/**
+ * 敏感词过滤配置
+ */
+const SENSITIVE_WORDS = {
+  // 中国相关
+  china: ['中国', 'China', 'PRC', '中华人民共和国', '中共', 'CCP', '共产党', 'party', 'Party'],
+  // 政治人物
+  leaders: ['主席', '
 async function translateWithDoubao(texts) {
   console.log(`🔄 使用本地增强翻译 ${texts.length} 条文本...`);
   return texts.map(enhancedTranslate);
@@ -267,19 +271,63 @@ function enhancedTranslate(text) {
     translated = translated.replace(regex, TRANSLATIONS[key]);
   }
   
-  // 第3步：清理多余的空格
+  // 第4步：清理多余的空格
   translated = translated.replace(/\s+/g, ' ').trim();
   
-  // 第4步：处理问号结尾
+  // 第5步：处理问号结尾
   if (text.endsWith('?') && !translated.endsWith('?')) {
     translated += '?';
   }
+  
+  // 第6步：敏感词过滤
+  translated = filterSensitiveWords(translated);
   
   return translated;
 }
 
 /**
- * 批量翻译市场标题
+ * 敏感词过滤 - 替换政治敏感词汇
+ */
+function filterSensitiveWords(text) {
+  if (!text) return '';
+  
+  let filtered = text;
+  
+  // 敏感词映射表
+  const sensitiveReplacements = [
+    // 中国相关
+    ['中国', '某国'],
+    ['中共', '某党'],
+    ['共产党', '某党派'],
+    ['CCP', '某党派'],
+    ['PRC', '某国'],
+    ['中华人民共和国', '某国'],
+    
+    // 政治人物称谓
+    ['主席', '领导人'],
+    ['总书记', '领导人'],
+    ['总理', '首相'],
+    ['总统', '领导人'],
+    ['元首', '领导人'],
+    
+    // 政府机构
+    ['人大', '议会'],
+    ['政协', '协商机构'],
+    ['国务院', '内阁'],
+    ['外交部', '外务部门'],
+    ['国防部', '防卫部门'],
+    
+    // 政治术语
+    ['政权', '当局'],
+    ['执政党', '执政党'],
+    ['在野党', '反对党'],
+    ['政治体制', '体制'],
+    ['意识形态', '理念'],
+    ['统一战线', '联盟'],
+    ['群众路线', '民众路线'],
+    ['阶级斗争', '阶层矛盾'],
+    ['文化大革命', '某时期'],
+    ['
  * @param {Array} markets 市场数据数组
  * @returns {Promise<Array>} 翻译后的市场数组
  */
