@@ -318,24 +318,20 @@ async function main() {
       console.error('❌ 获取活跃市场失败:', e.message);
     }
 
-    // 2. 按概率分层抽样，确保分布均衡
-    console.log('\n--- 按概率分层抽样 ---');
-    const highProb = allMarkets.filter(m => m.probability >= 70);  // 高概率 ≥70%
-    const midProb = allMarkets.filter(m => m.probability >= 40 && m.probability < 70);  // 中概率 40-70%
-    const lowProb = allMarkets.filter(m => m.probability < 40);  // 低概率 <40%
+    // 2. 按交易量排序，取前500条最热门的
+    console.log('\n--- 按交易量排序 ---');
+    allMarkets.sort((a, b) => b.volume - a.volume);
     
-    console.log(`  原始分布 - 高概率(≥70%): ${highProb.length}条, 中概率(40-70%): ${midProb.length}条, 低概率(<40%): ${lowProb.length}条`);
+    // 取前500条最热门的
+    const selectedMarkets = allMarkets.slice(0, 500);
     
-    // 分层抽样：确保各层都有足够样本
-    const sampleHigh = highProb.slice(0, 150);  // 取前150条高概率
-    const sampleMid = midProb.slice(0, 150);    // 取前150条中概率  
-    const sampleLow = lowProb.slice(0, 200);    // 取前200条低概率
+    // 统计概率分布
+    const highProb = selectedMarkets.filter(m => m.probability >= 70).length;
+    const midProb = selectedMarkets.filter(m => m.probability >= 40 && m.probability < 70).length;
+    const lowProb = selectedMarkets.filter(m => m.probability < 40).length;
     
-    // 合并并按交易量排序
-    let selectedMarkets = [...sampleHigh, ...sampleMid, ...sampleLow];
-    selectedMarkets.sort((a, b) => b.volume - a.volume);
-    
-    console.log(`✅ 分层抽样后: ${selectedMarkets.length}条 (高${sampleHigh.length}/中${sampleMid.length}/低${sampleLow.length})`);
+    console.log(`✅ 选取前500条最热门市场`);
+    console.log(`  概率分布 - 高概率(≥70%): ${highProb}条, 中概率(40-70%): ${midProb}条, 低概率(<40%): ${lowProb}条`);
 
     // 3. 批量翻译
     console.log('\n--- 开始豆包API翻译 ---');
