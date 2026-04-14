@@ -10,6 +10,7 @@ env:
   COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
   COS_BUCKET: ${{ secrets.COS_BUCKET }}
   COS_REGION: ${{ secrets.COS_REGION }}
+  COZE_API_KEY: ${{ secrets.COZE_API_KEY }}
 
 jobs:
   fetch-and-upload:
@@ -26,6 +27,7 @@ jobs:
         if [ -z "$COS_SECRET_KEY" ]; then echo "❌ COS_SECRET_KEY is not set"; exit 1; else echo "✅ COS_SECRET_KEY is set"; fi
         if [ -z "$COS_BUCKET" ]; then echo "❌ COS_BUCKET is not set"; exit 1; else echo "✅ COS_BUCKET: $COS_BUCKET"; fi
         if [ -z "$COS_REGION" ]; then echo "❌ COS_REGION is not set"; exit 1; else echo "✅ COS_REGION: $COS_REGION"; fi
+        if [ -z "$COZE_API_KEY" ]; then echo "⚠️ COZE_API_KEY is not set (will use simple translation)"; else echo "✅ COZE_API_KEY is set"; fi
 
     - name: Install dependencies
       run: |
