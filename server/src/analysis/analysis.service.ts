@@ -52,43 +52,19 @@ export class AnalysisService {
       const tag = eventDetail.tags?.[0]
       const tagLabel = typeof tag === 'object' ? tag?.label : tag
 
-      // 构建 AI 分析提示词
-      const systemPrompt = `你是一位专业的预测市场分析师，擅长分析预测事件与现实世界的联系。
-你的任务是深入分析预测市场事件的概率、波动和背景，挖掘其对现实世界的影响和意义。
-请用中文回答，保持专业、客观、有洞察力。`
+      // 构建 AI 分析提示词（避免敏感词）
+      const systemPrompt = `你是专业的预测市场数据分析师，专注金融、科技、体育等领域。
+只进行市场数据分析，不涉及敏感话题。用中文回答，保持专业、客观、数据驱动。`
 
-      const userPrompt = `
-请分析以下预测市场事件：
-
-事件问题：${eventDetail.question}
-当前概率：${eventDetail.probability}%
-分类：${tagLabel || '其他'}
-24小时交易量：$${((eventDetail.volume || 0) / 1000000).toFixed(1)}M
+      const userPrompt = `分析以下预测市场数据：
+问题：${eventDetail.questionZh || eventDetail.question}
+概率：${eventDetail.probabilityRaw || eventDetail.probability}%
+分类：${eventDetail.categoryZh || tagLabel || '其他'}
+交易量：$${((eventDetail.volume || 0) / 1000000).toFixed(1)}M
 流动性：$${((eventDetail.liquidity || 0) / 1000000).toFixed(1)}M
 
-请从以下角度进行深度分析：
-
-1. 现实意义（realityConnection）：深入分析这个事件对现实世界的影响，包括对经济、社会、政治或特定行业的影响
-2. 影响场景（impactScenarios）：列举 2-3 个具体的现实场景，描述如果该事件发生或不发生，会对现实世界产生什么具体影响
-3. 潜在影响（implications）：分析该事件对相关行业、市场、政策等方面的影响
-4. 风险因素（riskFactors）：分析可能导致概率发生重大变化的风险因素
-5. 置信度（confidence）：基于当前市场数据、波动性和流动性，评估你的分析置信度
-
-请以 JSON 格式返回，格式如下：
-{
-  "summary": "简洁的分析总结（1-2句话，概括核心观点）",
-  "realityConnection": "详细分析该事件对现实世界的深层影响（100-150字）",
-  "impactScenarios": ["场景1：具体描述现实影响1", "场景2：具体描述现实影响2", "场景3：具体描述现实影响3"],
-  "implications": ["影响1", "影响2", "影响3"],
-  "riskFactors": ["风险1", "风险2"],
-  "confidence": "高/中/低"
-}
-
-注意：
-- realityConnection 要深入分析，不能泛泛而谈
-- impactScenarios 要具体、可感知
-- confidence 要基于市场数据的可靠性（流动性、交易量、波动性等）来评估
-`
+JSON格式返回：
+{"summary":"市场总结","realityConnection":"市场影响分析","impactScenarios":["场景1","场景2"],"implications":["影响1","影响2"],"riskFactors":["风险1"],"confidence":"高/中/低"}`
 
       // 调用 LLM API
       console.log(`[AI分析] 开始调用LLM...`)
@@ -203,14 +179,14 @@ export class AnalysisService {
       if (probability >= 70) probabilityLevel = '高概率'
       else if (probability < 30) probabilityLevel = '低概率'
 
-      // 生成分类相关的现实影响
+      // 生成分类相关的市场影响
       const categoryImpacts: Record<string, { connection: string, scenarios: string[], implications: string[] }> = {
         '金融': {
-          connection: `该事件对${question.includes('美元') || question.includes('汇率') ? '国际货币体系' : question.includes('股票') || question.includes('股指') ? '资本市场' : question.includes('黄金') || question.includes('石油') ? '大宗商品市场' : '金融市场'}有显著影响。当前市场概率为${probability}%，${probabilityLevel}表明市场预期较为${probability >= 50 ? '乐观' : '谨慎'}。`,
+          connection: `该事件对${question.includes('美元') || question.includes('汇率') ? '国际货币体系' : question.includes('股票') || question.includes('股指') ? '资本市场' : question.includes('黄金') || question.includes('石油') ? '大宗商品市场' : '金融市场'}有显著影响。当前概率为${probability}%，${probabilityLevel}表明市场预期较为${probability >= 50 ? '乐观' : '谨慎'}。`,
           scenarios: [
             `如果该事件发生，可能引发${probability >= 50 ? '市场波动和资金流向变化' : '市场情绪提振和短期反弹'}，影响投资者决策`,
             `相关板块可能出现${probability >= 50 ? '结构性调整' : '短期交易机会'}，需要关注风险敞口`,
-            `政策制定者可能根据该事件调整${category.includes('金融') ? '货币政策或监管措施' : '相关政策'}`
+            `该事件可能影响相关行业的投资方向和资金配置`
           ],
           implications: [
             `影响${category}相关资产价格波动`,
@@ -241,19 +217,19 @@ export class AnalysisService {
           implications: [
             `加速相关技术在产业中的落地应用`,
             `可能重塑行业竞争格局`,
-            `影响监管政策的制定和调整`
+            `影响市场对相关技术的投资预期`
           ]
         },
         '其他': {
-          connection: `该事件反映了社会发展的趋势和挑战，具有广泛的现实意义。${probability}%的市场概率显示了公众${probability >= 50 ? '对结果持相对乐观态度' : '对结果存在较大不确定性'}。`,
+          connection: `该事件反映了市场关注的热点，具有广泛的现实意义。${probability}%的市场概率显示了市场${probability >= 50 ? '对结果持相对乐观态度' : '对结果存在较大不确定性'}。`,
           scenarios: [
-            `该结果可能影响相关政策制定和社会治理方向`,
-            `可能引发公众对相关议题的讨论和关注`,
+            `该结果可能影响相关市场的投资情绪和资金流向`,
+            `可能引发市场对相关议题的讨论和关注`,
             `对相关行业和企业产生长期影响`
           ],
           implications: [
-            `影响社会资源配置和投资方向`,
-            `可能改变公众对相关议题的认知`,
+            `影响市场资源配置和投资方向`,
+            `可能改变市场对相关议题的预期`,
             `对相关产业的长期发展产生影响`
           ]
         }
