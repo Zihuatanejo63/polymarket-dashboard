@@ -16,50 +16,47 @@ export class OssSyncService {
   private lastFetchTime: Date | null = null
   private readonly CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
 
-  // OSS配置
-  private ossConfig = {
+  // 腾讯云COS配置
+  private cosConfig = {
     region: '',
-    bucket: '',
-    accessKeyId: '',
-    accessKeySecret: ''
+    bucket: ''
   }
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService
   ) {
-    // 从环境变量读取OSS配置
-    this.ossConfig = {
-      region: this.configService.get<string>('OSS_REGION') || 'oss-cn-hangzhou',
-      bucket: this.configService.get<string>('OSS_BUCKET') || '',
-      accessKeyId: this.configService.get<string>('OSS_ACCESS_KEY_ID') || '',
-      accessKeySecret: this.configService.get<string>('OSS_ACCESS_KEY_SECRET') || ''
+    // 从环境变量读取COS配置
+    this.cosConfig = {
+      region: this.configService.get<string>('COS_REGION') || 'ap-singapore',
+      bucket: this.configService.get<string>('COS_BUCKET') || ''
     }
 
     // 启动时立即加载数据
-    this.loadDataFromOSS()
+    this.loadDataFromCOS()
 
     // 设置定时刷新（每5分钟）
     setInterval(() => {
-      this.loadDataFromOSS()
+      this.loadDataFromCOS()
     }, this.CACHE_DURATION)
   }
 
   /**
-   * 从OSS加载数据
+   * 从腾讯云COS加载数据
    */
-  private async loadDataFromOSS(): Promise<void> {
+  private async loadDataFromCOS(): Promise<void> {
     try {
-      console.log('[OSS Sync] 从OSS加载数据...')
+      console.log('[COS Sync] 从腾讯云COS加载数据...')
 
-      // 构建OSS公共访问URL
-      const ossUrl = `https://${this.ossConfig.bucket}.${this.ossConfig.region}.aliyuncs.com/polymarket-data.json`
+      // 构建COS公共访问URL
+      // 腾讯云COS标准访问域名格式: https://{bucket}.cos.{region}.myqcloud.com
+      const cosUrl = `https://${this.cosConfig.bucket}.cos.${this.cosConfig.region}.myqcloud.com/polymarket-data.json`
 
-      console.log('[OSS Sync] OSS URL:', ossUrl)
+      console.log('[COS Sync] COS URL:', cosUrl)
 
-      // 从OSS获取数据（公共读取）
+      // 从COS获取数据（公共读取）
       const response = await lastValueFrom(
-        this.httpService.get(ossUrl, {
+        this.httpService.get(cosUrl, {
           timeout: 30000,
           headers: {
             'Cache-Control': 'no-cache'
@@ -70,16 +67,16 @@ export class OssSyncService {
       if (response.data && response.data.markets) {
         this.cachedData = response.data
         this.lastFetchTime = new Date()
-        console.log(`[OSS Sync] 成功加载 ${response.data.total} 个市场数据`)
-        console.log('[OSS Sync] 数据时间:', response.data.fetchedAt)
+        console.log(`[COS Sync] 成功加载 ${response.data.total} 个市场数据`)
+        console.log('[COS Sync] 数据时间:', response.data.fetchedAt)
       } else {
-        console.warn('[OSS Sync] OSS数据格式不正确')
+        console.warn('[COS Sync] COS数据格式不正确')
       }
     } catch (error: any) {
-      console.error('[OSS Sync] 从OSS加载数据失败:', error.message)
+      console.error('[COS Sync] 从COS加载数据失败:', error.message)
       // 如果有缓存，继续使用缓存
       if (this.cachedData) {
-        console.log('[OSS Sync] 使用缓存数据')
+        console.log('[COS Sync] 使用缓存数据')
       }
     }
   }
@@ -170,7 +167,7 @@ export class OssSyncService {
    * 强制刷新数据
    */
   async forceRefresh(): Promise<boolean> {
-    await this.loadDataFromOSS()
+    await this.loadDataFromCOS()
     return this.cachedData !== null
   }
 }

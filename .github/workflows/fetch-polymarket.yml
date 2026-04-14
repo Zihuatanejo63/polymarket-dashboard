@@ -6,10 +6,10 @@ on:
   workflow_dispatch:  # 允许手动触发
 
 env:
-  OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
-  OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-  OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
-  OSS_REGION: ${{ secrets.OSS_REGION }}
+  COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+  COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+  COS_BUCKET: ${{ secrets.COS_BUCKET }}
+  COS_REGION: ${{ secrets.COS_REGION }}
 
 jobs:
   fetch-and-upload:
@@ -26,7 +26,7 @@ jobs:
         
     - name: Install dependencies
       run: |
-        npm install axios ali-oss
+        npm install axios cos-nodejs-sdk-v5
         
     - name: Fetch Polymarket Data
       run: |
@@ -123,28 +123,35 @@ jobs:
         fetchData();
         "
         
-    - name: Upload to Aliyun OSS
+    - name: Upload to Tencent COS
       run: |
         node -e "
-        const OSS = require('ali-oss');
+        const COS = require('cos-nodejs-sdk-v5');
         const fs = require('fs');
         
         async function upload() {
           try {
-            const client = new OSS({
-              region: process.env.OSS_REGION,
-              accessKeyId: process.env.OSS_ACCESS_KEY_ID,
-              accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET,
-              bucket: process.env.OSS_BUCKET
+            const cos = new COS({
+              SecretId: process.env.COS_SECRET_ID,
+              SecretKey: process.env.COS_SECRET_KEY
             });
             
-            console.log('Uploading to OSS...');
-            const result = await client.put('polymarket-data.json', 'polymarket-data.json');
-            console.log('Upload success:', result.url);
+            console.log('Uploading to COS...');
+            console.log('Bucket:', process.env.COS_BUCKET);
+            console.log('Region:', process.env.COS_REGION);
             
-            // 设置文件为公共可读
-            await client.putACL('polymarket-data.json', 'public-read');
-            console.log('Set public read access');
+            const result = await cos.putObject({
+              Bucket: process.env.COS_BUCKET,
+              Region: process.env.COS_REGION,
+              Key: 'polymarket-data.json',
+              Body: fs.readFileSync('polymarket-data.json'),
+              ContentType: 'application/json',
+              ACL: 'public-read'  // 设置公共读取权限
+            });
+            
+            console.log('Upload success!');
+            console.log('ETag:', result.ETag);
+            console.log('URL: https://' + process.env.COS_BUCKET + '.cos.' + process.env.COS_REGION + '.myqcloud.com/polymarket-data.json');
           } catch (error) {
             console.error('Upload failed:', error.message);
             process.exit(1);
