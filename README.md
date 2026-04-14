@@ -49,6 +49,35 @@
 
 ## 快速开始
 
+### 环境配置
+
+1. 复制环境变量示例文件：
+
+```bash
+cp .env.example .env
+```
+
+2. 配置Dune Analytics API密钥（可选，用于获取真实数据）：
+
+   - 注册Dune账号: https://dune.com/
+   - 获取API密钥: https://dune.com/docs/api
+   - 编辑`.env`文件，添加API密钥：
+
+```env
+DUNE_API_KEY=your_dune_api_key_here
+```
+
+   详细配置说明请参考：[DUNE_API_SETUP.md](./DUNE_API_SETUP.md)
+
+   **注意**: 如果不配置API密钥，系统会自动使用高质量模拟数据，不影响功能使用。
+
+3. 本地开发（可选）：
+
+```bash
+# 设置项目根目录（如果不在项目根目录）
+cd /workspace/projects
+```
+
 ### 安装依赖
 
 ```bash

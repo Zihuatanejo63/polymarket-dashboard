@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { HttpService } from '@nestjs/axios'
+import { ConfigService } from '@nestjs/config'
 import { lastValueFrom } from 'rxjs'
 
 export interface PolymarketEvent {
@@ -22,10 +23,11 @@ export interface PolymarketEvent {
 export class PolymarketDuneService {
   // Dune Analytics API
   private readonly DUNE_API = 'https://api.dune.com/api/v1'
-  // 使用公开查询ID：Polymarket市场数据
-  private readonly POLYMARKET_QUERY_ID = '3567471'
 
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    private readonly configService: ConfigService
+  ) {}
 
   /**
    * 从Dune Analytics获取Polymarket数据
@@ -34,14 +36,29 @@ export class PolymarketDuneService {
     try {
       console.log('[Dune] 尝试获取Polymarket市场数据...')
 
+      // 从环境变量获取API密钥
+      const apiKey = this.configService.get<string>('DUNE_API_KEY')
+
+      if (!apiKey) {
+        console.warn('[Dune] 未配置DUNE_API_KEY，跳过Dune数据源')
+        return []
+      }
+
+      console.log('[Dune] 使用API密钥访问Dune Analytics...')
+
+      // 使用公开查询ID：Polymarket市场数据
+      // 这个查询ID是公开的，不需要私有查询
+      const queryId = '3567471' // Polymarket活跃市场查询
+
       // 执行查询
       const response = await lastValueFrom(
         this.httpService.post(
-          `${this.DUNE_API}/query/${this.POLYMARKET_QUERY_ID}/execute`,
+          `${this.DUNE_API}/query/${queryId}/execute`,
           {},
           {
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'x-dune-api-key': apiKey
             },
             timeout: 30000 // Dune查询可能需要较长时间
           }
@@ -54,7 +71,7 @@ export class PolymarketDuneService {
         const executionId = response.data.execution_id
 
         // 轮询查询结果
-        const results = await this.pollQueryResults(executionId)
+        const results = await this.pollQueryResults(executionId, apiKey)
 
         if (results && results.length > 0) {
           console.log(`[Dune] 成功获取 ${results.length} 个市场`)
@@ -67,6 +84,12 @@ export class PolymarketDuneService {
 
     } catch (error: any) {
       console.error('[Dune] 获取市场失败:', error.message)
+
+      // 如果是认证错误，提示配置API密钥
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.error('[Dune] 认证失败，请检查DUNE_API_KEY配置')
+      }
+
       return []
     }
   }
@@ -74,7 +97,7 @@ export class PolymarketDuneService {
   /**
    * 轮询查询结果
    */
-  private async pollQueryResults(executionId: string, maxAttempts = 30): Promise<any[] | null> {
+  private async pollQueryResults(executionId: string, apiKey: string, maxAttempts = 30): Promise<any[] | null> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         console.log(`[Dune] 轮询查询结果 (${attempt + 1}/${maxAttempts})...`)
@@ -84,7 +107,8 @@ export class PolymarketDuneService {
             `${this.DUNE_API}/execution/${executionId}/results`,
             {
               headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-dune-api-key': apiKey
               },
               timeout: 10000
             }
