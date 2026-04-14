@@ -6,9 +6,10 @@ import { MarketController } from './market.controller'
 import { PolymarketModule } from '../polymarket/polymarket.module'
 import { PolymarketGoldskyModule } from '../polymarket-goldsky/polymarket-goldsky.module'
 import { PolymarketDuneModule } from '../polymarket-dune/polymarket-dune.module'
+import { PolymarketProxyModule } from '../polymarket-proxy/polymarket-proxy.module'
 
 @Module({
-  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule],
+  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule],
   controllers: [MarketController],
   providers: [MarketService],
   exports: [MarketService],

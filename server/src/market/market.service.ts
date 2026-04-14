@@ -5,6 +5,7 @@ import { lastValueFrom } from 'rxjs'
 import { PolymarketService } from '../polymarket/polymarket.service'
 import { PolymarketGoldskyService } from '../polymarket-goldsky/polymarket-goldsky.service'
 import { PolymarketDuneService } from '../polymarket-dune/polymarket-dune.service'
+import { PolymarketProxyService } from '../polymarket-proxy/polymarket-proxy.service'  
 
 export interface MarketEvent {
   id: string
@@ -34,11 +35,12 @@ export class MarketService {
     private polymarketService: PolymarketService,
     private goldskyService: PolymarketGoldskyService,
     private duneService: PolymarketDuneService,
+    private proxyService: PolymarketProxyService,
   ) {}
 
   /**
    * 获取 Poly Market 数据
-   * 优先顺序：Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
+   * 优先顺序：Proxy (无限制) -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -48,7 +50,28 @@ export class MarketService {
     }
 
     try {
-      // 优先尝试从 Dune Analytics 获取真实数据
+      // 优先尝试从 Proxy Service 获取数据（无限制查询）
+      console.log('[MarketService] 尝试从 Proxy Service 获取数据（无限制查询）...')
+      const proxyMarkets = await this.proxyService.getAllMarkets()
+      console.log(`[MarketService] 从 Proxy Service 获取了 ${proxyMarkets.length} 个事件`)
+
+      if (proxyMarkets.length > 0) {
+        // 转换数据格式
+        const transformedEvents = this.transformProxyToMarket(proxyMarkets)
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+        console.log(`[MarketService] 成功使用 Proxy Service 真实数据，共 ${transformedEvents.length} 个事件`)
+        return transformedEvents
+      }
+    } catch (error) {
+      console.error('[MarketService] 从 Proxy Service 获取数据失败:', error.message)
+    }
+
+    try {
+      // Proxy 失败，尝试从 Dune Analytics 获取真实数据
       console.log('[MarketService] 尝试从 Dune Analytics 获取真实数据...')
       const duneEvents = await this.duneService.getActiveMarkets()
       console.log(`[MarketService] 从 Dune Analytics 获取了 ${duneEvents.length} 个事件`)
@@ -119,6 +142,36 @@ export class MarketService {
 
       return mockData
     }
+  }
+
+  /**
+   * 转换 Proxy 数据为标准格式
+   */
+  private transformProxyToMarket(proxyMarkets: any[]): MarketEvent[] {
+    return proxyMarkets.map(market => {
+      // 从 Proxy 数据中提取信息
+      const question = market.question || '未命名事件'
+
+      // 根据 question 内容自动分类
+      const category = this.categorizeEvent(question)
+
+      // 概率已经在 proxyMarkets 中计算过了
+      const probability = market.probability || 50
+
+      // 计算24小时变化（这里默认为0，因为Proxy可能不提供这个数据）
+      const change24h = 0
+
+      return {
+        id: market.id || `proxy_${Math.random().toString(36).substr(2, 9)}`,
+        question,
+        probability,
+        price: probability / 100,
+        volume24h: market.volume || 0,
+        liquidity: market.liquidity || 0,
+        category,
+        change24h
+      }
+    })
   }
 
   /**
