@@ -5,7 +5,7 @@ import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Star, ArrowUpRight, ChevronDown, Search, SlidersHorizontal, Bookmark } from 'lucide-react-taro'  
+import { Star, Search, SlidersHorizontal, Bookmark } from 'lucide-react-taro'  
 import './index.config'  
 
 // 分类配置  
@@ -81,11 +81,6 @@ const IndexPage = () => {
   const [, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
-  
-  // 新增状态：下拉菜单
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const [selectedVolumeRange, setSelectedVolumeRange] = useState('24h')
-  const [selectedStatus, setSelectedStatus] = useState('active')
 
   useLoad(() => {
     loadEvents()
@@ -367,81 +362,6 @@ const IndexPage = () => {
       {/* 筛选区域 */}
       <View className="bg-white px-4 py-3 border-b border-gray-200">
         <View className="flex flex-row items-center gap-2 flex-wrap">
-          {/* 下拉筛选器 */}
-          <View className="flex items-center gap-2">
-            {/* 交易量下拉 */}
-            <View className="relative">
-              <View 
-                onClick={() => setOpenDropdown(openDropdown === 'volume' ? null : 'volume')}
-                className="flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 bg-white active:bg-gray-50"
-              >
-                <ArrowUpRight size={14} color="#22c55e" />
-                <Text className="block text-sm text-gray-700">
-                  {selectedVolumeRange === '24h' ? '24小时交易量' : 
-                   selectedVolumeRange === '7d' ? '7天交易量' : '30天交易量'}
-                </Text>
-                <ChevronDown size={14} color="#9ca3af" className={openDropdown === 'volume' ? 'rotate-180' : ''} />
-              </View>
-              {openDropdown === 'volume' && (
-                <View className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 min-w-36 z-50">
-                  {[
-                    { value: '24h', label: '24小时交易量' },
-                    { value: '7d', label: '7天交易量' },
-                    { value: '30d', label: '30天交易量' }
-                  ].map((opt) => (
-                    <View
-                      key={opt.value}
-                      onClick={() => {
-                        setSelectedVolumeRange(opt.value)
-                        setOpenDropdown(null)
-                      }}
-                      className={`px-4 py-2 text-sm ${
-                        selectedVolumeRange === opt.value ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
-                      }`}
-                    >
-                      <Text className="block">{opt.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-            
-            {/* 状态下拉 */}
-            <View className="relative">
-              <View 
-                onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
-                className="flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 bg-white active:bg-gray-50"
-              >
-                <Text className="block text-sm text-gray-700">
-                  {selectedStatus === 'all' ? '全部' : 
-                   selectedStatus === 'active' ? '进行中' : '已结束'}
-                </Text>
-                <ChevronDown size={14} color="#9ca3af" className={openDropdown === 'status' ? 'rotate-180' : ''} />
-              </View>
-              {openDropdown === 'status' && (
-                <View className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-100 py-1 min-w-28 z-50">
-                  {[
-                    { value: 'all', label: '全部' },
-                    { value: 'active', label: '进行中' },
-                    { value: 'ended', label: '已结束' }
-                  ].map((opt) => (
-                    <View
-                      key={opt.value}
-                      onClick={() => {
-                        setSelectedStatus(opt.value)
-                        setOpenDropdown(null)
-                      }}
-                      className={`px-4 py-2 text-sm ${
-                        selectedStatus === opt.value ? 'text-blue-600 bg-blue-50' : 'text-gray-700'
-                      }`}
-                    >
-                      <Text className="block">{opt.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </View>
         </View>
       </View>
 
