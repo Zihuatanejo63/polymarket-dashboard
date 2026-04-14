@@ -19,128 +19,146 @@ const COZE_API_URL = 'https://api.coze.cn/open_api/v2/chat';
  * @param {string[]} texts 要翻译的英文文本数组
  * @returns {Promise<string[]>} 中文翻译数组
  */
+/**
+ * 使用增强本地翻译（无需API）
+ */
 async function translateWithDoubao(texts) {
-  if (!COZE_API_KEY) {
-    console.warn('⚠️ 未配置COZE_API_KEY，使用简单翻译');
-    return texts.map(simpleTranslate);
-  }
-
-  console.log(`🔄 调用豆包API翻译 ${texts.length} 条文本...`);
-
-  // 构建批量翻译prompt
-  const prompt = `请将以下PolyMarket预测市场标题全部翻译成中文。
-
-要求：
-1. 全文翻译，包括所有的英文单词（如 "Will"、"the"、"in"、"before"、"on"、"win"、"election" 等）
-2. 人名可音译或保留（如 "LeBron James" → "勒布朗·詹姆斯"）
-3. 地名、组织名可音译或保留
-4. 输出必须是完整通顺的中文句子
-5. 格式：每行一个翻译，与输入顺序一致
-
-翻译示例：
-- 输入: "Will LeBron James win the 2028 US Presidential election?"
-- 输出: "勒布朗·詹姆斯会赢得2028年美国总统选举吗？"
-- 输入: "Will Jesus Christ return before GTA VI?"
-- 输出: "耶稣基督会在GTA6发售前降临吗？"
-- 输入: "Will Chelsea Clinton win the 2028 Democratic presidential nomination?"
-- 输出: "切尔西·克林顿会赢得2028年民主党总统提名吗？"
-
-待翻译内容（共${texts.length}条）：
-${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
-
-请只返回翻译结果，每行一条，不要编号和额外说明：`;
-
-  return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({
-      bot_id: '7398091034558922764', // 使用Coze Bot ID
-      user_id: 'github-actions',
-      additional_messages: [
-        { role: 'user', content: prompt, content_type: 'text' }
-      ],
-      stream: false
-    });
-
-    console.log('  发送请求到Coze API...');
-
-    const req = https.request(COZE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${COZE_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': '*/*'
-      },
-      timeout: 60000
-    }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          console.log('  API响应状态:', res.statusCode);
-          
-          const result = JSON.parse(data);
-          
-          if (result.code !== 0) {
-            console.error('❌ Coze API错误:', result.msg);
-            resolve(texts.map(simpleTranslate));
-            return;
-          }
-
-          // 解析翻译结果 - Coze API返回格式
-          const content = result.data?.messages?.[0]?.content || '';
-          console.log('  收到翻译内容长度:', content.length);
-          
-          const translations = content.split('\n').filter(line => line.trim());
-          console.log('  解析出行数:', translations.length, '期望:', texts.length);
-
-          // 确保返回数量与输入一致
-          if (translations.length >= texts.length) {
-            console.log('✅ Coze API翻译成功');
-            resolve(translations.slice(0, texts.length));
-          } else {
-            console.warn('⚠️ 翻译结果数量不匹配，使用混合策略');
-            const result = [];
-            for (let i = 0; i < texts.length; i++) {
-              result.push(translations[i] || simpleTranslate(texts[i]));
-            }
-            resolve(result);
-          }
-        } catch (e) {
-          console.error('❌ 解析Coze API响应失败:', e.message);
-          console.error('  原始响应:', data.substring(0, 200));
-          resolve(texts.map(simpleTranslate));
-        }
-      });
-    });
-
-    req.on('error', (err) => {
-      console.error('❌ Coze API请求失败:', err.message);
-      resolve(texts.map(simpleTranslate));
-    });
-
-    req.on('timeout', () => {
-      console.error('❌ Coze API超时');
-      req.destroy();
-      resolve(texts.map(simpleTranslate));
-    });
-
-    req.write(postData);
-    req.end();
-  });
+  console.log(`🔄 使用本地增强翻译 ${texts.length} 条文本...`);
+  return texts.map(enhancedTranslate);
 }
 
 /**
- * 简单关键词替换翻译（降级方案）
+ * 增强本地翻译字典（无需API）
  */
 const TRANSLATIONS = {
-  'Will': '是否', 'Trump': '特朗普', 'Biden': '拜登', 'win': '赢得',
-  'election': '选举', 'president': '总统', 'Bitcoin': '比特币',
-  'Ethereum': '以太坊', 'price': '价格', 'hit': '达到', 'by': '在...之前',
-  'before': '之前', 'after': '之后', 'released': '发布',
-  'GTA': 'GTA', 'Ukraine': '乌克兰', 'Russia': '俄罗斯', 'war': '战争',
-  'ceasefire': '停火', 'deal': '协议', 'agreement': '协议',
-  'NBA': 'NBA', 'NFL': 'NFL', 'championship': '冠军', 'finals': '决赛',
-  'AI': 'AI', 'Tesla': '特斯拉', 'Apple': '苹果', 'Google': '谷歌',
-  'CEO': 'CEO', 'CEO ': '首席执行官 ', 'stock': '股票', 'market': '市场'
+  // 基础词汇
+  'Will': '是否', 'will': '将', 'the': '', 'a': '', 'an': '',
+  'to': '至', 'of': '的', 'in': '在', 'on': '在', 'at': '在',
+  'for': '为了', 'with': '与', 'and': '和', 'or': '或',
+  'by': '在...之前', 'before': '之前', 'after': '之后',
+  'during': '期间', 'within': '在...内', 'until': '直到',
+  
+  // 动作
+  'win': '赢得', 'wins': '赢得', 'winning': '赢得',
+  'lose': '输掉', 'loses': '输掉',
+  'become': '成为', 'becomes': '成为',
+  'announce': '宣布', 'announces': '宣布', 'announced': '宣布',
+  'release': '发布', 'releases': '发布', 'released': '发布',
+  'launch': '推出', 'launches': '推出', 'launched': '推出',
+  'hit': '达到', 'hits': '达到', 'reaches': '达到',
+  'happen': '发生', 'happens': '发生',
+  'sign': '签署', 'signs': '签署',
+  'pass': '通过', 'passes': '通过',
+  'end': '结束', 'ends': '结束',
+  'start': '开始', 'starts': '开始', 'begin': '开始', 'begins': '开始',
+  'join': '加入', 'joins': '加入',
+  'leave': '离开', 'leaves': '离开',
+  'buy': '收购', 'buys': '收购',
+  'sell': '出售', 'sells': '出售',
+  
+  // 选举政治
+  'election': '选举', 'elections': '选举',
+  'president': '总统', 'presidential': '总统的',
+  'nomination': '提名', 'nominee': '被提名人',
+  'candidate': '候选人', 'candidates': '候选人',
+  'primary': '初选', 'primaries': '初选',
+  'vote': '投票', 'votes': '投票', 'voting': '投票',
+  'poll': '民调', 'polls': '民调',
+  'campaign': '竞选', 'campaigns': '竞选',
+  'debate': '辩论', 'debates': '辩论',
+  'concede': '承认败选', 'concedes': '承认败选',
+  'Democratic': '民主党', 'Republican': '共和党',
+  'Senate': '参议院', 'House': '众议院', 'Congress': '国会',
+  'governor': '州长', 'mayor': '市长',
+  
+  // 人物
+  'Trump': '特朗普', 'Donald Trump': '唐纳德·特朗普',
+  'Biden': '拜登', 'Joe Biden': '乔·拜登',
+  'Harris': '哈里斯', 'Kamala Harris': '卡玛拉·哈里斯',
+  'Obama': '奥巴马',
+  'Musk': '马斯克', 'Elon Musk': '埃隆·马斯克',
+  'Zelensky': '泽连斯基',
+  'Putin': '普京',
+  'Netanyahu': '内塔尼亚胡',
+  'LeBron James': '勒布朗·詹姆斯',
+  'Chelsea Clinton': '切尔西·克林顿',
+  'Oprah Winfrey': '奥普拉·温弗瑞',
+  'Jesus Christ': '耶稣基督',
+  
+  // 国家地区
+  'US': '美国', 'USA': '美国', 'United States': '美国',
+  'China': '中国', 'Russia': '俄罗斯', 'Ukraine': '乌克兰',
+  'Israel': '以色列', 'Iran': '伊朗', 'Gaza': '加沙',
+  'Taiwan': '台湾',
+  'NATO': '北约', 'EU': '欧盟',
+  
+  // 加密货币
+  'Bitcoin': '比特币', 'BTC': '比特币',
+  'Ethereum': '以太坊', 'ETH': '以太坊',
+  'crypto': '加密货币', 'cryptocurrency': '加密货币',
+  'blockchain': '区块链',
+  
+  // 金融
+  'stock': '股票', 'stocks': '股票',
+  'market': '市场', 'markets': '市场',
+  'price': '价格', 'prices': '价格',
+  'trade': '交易', 'trading': '交易',
+  'rate': '利率', 'rates': '利率',
+  'inflation': '通胀', 'recession': '衰退',
+  'IPO': 'IPO', 'merger': '合并',
+  'S&P 500': '标普500', 'Nasdaq': '纳斯达克',
+  
+  // 科技
+  'AI': 'AI', 'artificial intelligence': '人工智能',
+  'Tesla': '特斯拉', 'SpaceX': 'SpaceX',
+  'Apple': '苹果', 'iPhone': 'iPhone',
+  'Google': '谷歌', 'Alphabet': 'Alphabet',
+  'Microsoft': '微软', 'Amazon': '亚马逊',
+  'Meta': 'Meta', 'Facebook': 'Facebook',
+  'OpenAI': 'OpenAI', 'ChatGPT': 'ChatGPT',
+  
+  // 游戏
+  'GTA': 'GTA', 'GTA VI': 'GTA6', 'Grand Theft Auto': '侠盗猎车手',
+  'release': '发布', 'released': '发布',
+  
+  // 体育
+  'NBA': 'NBA', 'NFL': 'NFL', 'MLB': 'MLB', 'NHL': 'NHL',
+  'Super Bowl': '超级碗', 'World Cup': '世界杯',
+  'championship': '冠军', 'champion': '冠军',
+  'finals': '决赛', 'final': '决赛',
+  'playoffs': '季后赛',
+  'MVP': 'MVP',
+  
+  // 娱乐
+  'Oscar': '奥斯卡', 'Oscars': '奥斯卡',
+  'Grammy': '格莱美', 'Grammys': '格莱美',
+  'Emmy': '艾美', 'Emmys': '艾美',
+  'Academy Awards': '奥斯卡奖',
+  
+  // 时间
+  'January': '1月', 'February': '2月', 'March': '3月', 'April': '4月',
+  'May': '5月', 'June': '6月', 'July': '7月', 'August': '8月',
+  'September': '9月', 'October': '10月', 'November': '11月', 'December': '12月',
+  '2024': '2024年', '2025': '2025年', '2026': '2026年', '2027': '2027年', '2028': '2028年',
+  'year': '年', 'years': '年',
+  'month': '月', 'months': '月',
+  'week': '周', 'weeks': '周',
+  'day': '日', 'days': '天',
+  
+  // 事件
+  'war': '战争', 'ceasefire': '停火', 'truce': '停战',
+  'invasion': '入侵', 'attack': '攻击',
+  'deal': '协议', 'agreement': '协议', 'treaty': '条约',
+  'sanctions': '制裁',
+  
+  // 其他
+  'dead': '死亡', 'died': '死亡', 'dies': '死亡',
+  'resign': '辞职', 'resigns': '辞职', 'resigned': '辞职',
+  'impeach': '弹劾', 'impeached': '弹劾',
+  'indict': '起诉', 'indicted': '起诉',
+  'arrest': '逮捕', 'arrested': '逮捕',
+  'declare': '宣布', 'declares': '宣布',
+  'recognize': '承认', 'recognizes': '承认',
 };
 
 function simpleTranslate(text) {
@@ -152,6 +170,95 @@ function simpleTranslate(text) {
     const regex = new RegExp(`\\b${key}\\b`, 'gi');
     translated = translated.replace(regex, TRANSLATIONS[key]);
   }
+  return translated;
+}
+
+/**
+ * 增强本地翻译 - 更智能的处理
+ */
+function enhancedTranslate(text) {
+  if (!text) return '';
+  
+  let translated = text;
+  
+  // 第1步：处理特殊词组（优先替换长的词组）
+  const phrases = [
+    ['Will', '是否'],
+    ['win the', '赢得'],
+    ['win a', '赢得'],
+    ['US Presidential election', '美国总统选举'],
+    ['presidential election', '总统选举'],
+    ['presidential nomination', '总统提名'],
+    ['Democratic nomination', '民主党提名'],
+    ['Republican nomination', '共和党提名'],
+    ['2028 election', '2028年选举'],
+    ['2024 election', '2024年选举'],
+    ['2025', '2025年'],
+    ['2026', '2026年'],
+    ['2027', '2027年'],
+    ['2028', '2028年'],
+    ['by 2025', '在2025年前'],
+    ['by 2026', '在2026年前'],
+    ['by the end of', '在...结束前'],
+    ['GTA VI', 'GTA6'],
+    ['Jesus Christ', '耶稣基督'],
+    ['LeBron James', '勒布朗·詹姆斯'],
+    ['Chelsea Clinton', '切尔西·克林顿'],
+    ['Oprah Winfrey', '奥普拉·温弗瑞'],
+    ['Donald Trump', '唐纳德·特朗普'],
+    ['Joe Biden', '乔·拜登'],
+    ['Kamala Harris', '卡玛拉·哈里斯'],
+    ['Elon Musk', '埃隆·马斯克'],
+    ['United States', '美国'],
+    ['White House', '白宫'],
+    ['Supreme Court', '最高法院'],
+    ['Federal Reserve', '美联储'],
+    ['interest rates', '利率'],
+    ['stock market', '股票市场'],
+    ['S&P 500', '标普500'],
+    ['all time high', '历史新高'],
+    ['all-time high', '历史新高'],
+    ['before the end of', '在...结束前'],
+    ['before the', '在...之前'],
+    ['before 2025', '在2025年前'],
+    ['before 2026', '在2026年前'],
+    ['before January', '在1月前'],
+    ['before February', '在2月前'],
+    ['before March', '在3月前'],
+    ['before April', '在4月前'],
+    ['before May', '在5月前'],
+    ['before June', '在6月前'],
+    ['before July', '在7月前'],
+    ['before August', '在8月前'],
+    ['before September', '在9月前'],
+    ['before October', '在10月前'],
+    ['before November', '在11月前'],
+    ['before December', '在12月前'],
+  ];
+  
+  // 按长度降序排序词组
+  phrases.sort((a, b) => b[0].length - a[0].length);
+  
+  for (const [from, to] of phrases) {
+    const regex = new RegExp(`\\b${from}\\b`, 'gi');
+    translated = translated.replace(regex, to);
+  }
+  
+  // 第2步：使用TRANSLATIONS字典替换单个词
+  const sorted = Object.keys(TRANSLATIONS).sort((a, b) => b.length - a.length);
+  for (const key of sorted) {
+    const regex = new RegExp(`\\b${key}\\b`, 'gi');
+    translated = translated.replace(regex, TRANSLATIONS[key]);
+  }
+  
+  // 第3步：清理多余的空格
+  translated = translated.replace(/\s+/g, ' ').trim();
+  
+  // 第4步：处理问号结尾
+  if (text.endsWith('?') && !translated.endsWith('?')) {
+    translated += '?';
+  }
+  
   return translated;
 }
 
