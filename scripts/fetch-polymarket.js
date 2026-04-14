@@ -19,19 +19,6 @@ async function translateWithDoubao(texts) {
 }
 
 /**
- * 敏感词过滤配置
- */
-const SENSITIVE_WORDS = {
-  // 中国相关
-  china: ['中国', 'China', 'PRC', '中华人民共和国', '中共', 'CCP', '共产党', 'party', 'Party'],
-  // 政治人物
-  leaders: ['主席', '
-async function translateWithDoubao(texts) {
-  console.log(`🔄 使用本地增强翻译 ${texts.length} 条文本...`);
-  return texts.map(enhancedTranslate);
-}
-
-/**
  * 增强本地翻译字典（无需API）
  */
 const TRANSLATIONS = {
@@ -327,7 +314,18 @@ function filterSensitiveWords(text) {
     ['群众路线', '民众路线'],
     ['阶级斗争', '阶层矛盾'],
     ['文化大革命', '某时期'],
-    ['
+  ];
+  
+  for (const [from, to] of sensitiveReplacements) {
+    const regex = new RegExp(from, 'gi');
+    filtered = filtered.replace(regex, to);
+  }
+  
+  return filtered;
+}
+
+/**
+ * 批量翻译市场标题
  * @param {Array} markets 市场数据数组
  * @returns {Promise<Array>} 翻译后的市场数组
  */
