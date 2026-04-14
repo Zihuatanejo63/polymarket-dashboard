@@ -28,16 +28,27 @@ async function translateWithDoubao(texts) {
   console.log(`🔄 调用豆包API翻译 ${texts.length} 条文本...`);
 
   // 构建批量翻译prompt
-  const prompt = `请将以下PolyMarket预测市场标题翻译成中文。要求：
-1. 保持原文意思准确
-2. 使用自然的中文表达
-3. 保留专有名词（如人名、地名）
-4. 格式：每行一个翻译，与输入顺序一致
+  const prompt = `请将以下PolyMarket预测市场标题全部翻译成中文。
+
+要求：
+1. 全文翻译，包括所有的英文单词（如 "Will"、"the"、"in"、"before"、"on"、"win"、"election" 等）
+2. 人名可音译或保留（如 "LeBron James" → "勒布朗·詹姆斯"）
+3. 地名、组织名可音译或保留
+4. 输出必须是完整通顺的中文句子
+5. 格式：每行一个翻译，与输入顺序一致
+
+翻译示例：
+- 输入: "Will LeBron James win the 2028 US Presidential election?"
+- 输出: "勒布朗·詹姆斯会赢得2028年美国总统选举吗？"
+- 输入: "Will Jesus Christ return before GTA VI?"
+- 输出: "耶稣基督会在GTA6发售前降临吗？"
+- 输入: "Will Chelsea Clinton win the 2028 Democratic presidential nomination?"
+- 输出: "切尔西·克林顿会赢得2028年民主党总统提名吗？"
 
 待翻译内容（共${texts.length}条）：
 ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
-请只返回翻译结果，每行一条，不要编号：`;
+请只返回翻译结果，每行一条，不要编号和额外说明：`;
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
@@ -171,7 +182,10 @@ async function batchTranslateMarkets(markets) {
 
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
-    console.log(`Fetching: ${url}`);
+    const isCosUrl = url.includes('myqcloud.com');
+    if (!isCosUrl) {
+      console.log(`Fetching: ${url}`);
+    }
     https.get(url, {
       headers: {
         'Accept': 'application/json',
@@ -185,7 +199,13 @@ function fetchUrl(url) {
         try { resolve(JSON.parse(data)); }
         catch (e) { reject(new Error(`JSON解析失败`)); }
       });
-    }).on('error', reject).setTimeout(30000, () => reject(new Error('超时')));
+    }).on('error', (err) => {
+      if (!isCosUrl) {
+        reject(err);
+      } else {
+        reject(new Error('文件不存在'));
+      }
+    }).setTimeout(30000, () => reject(new Error('超时')));
   });
 }
 
@@ -257,6 +277,23 @@ async function uploadToCOS(data) {
   });
 }
 
+async function uploadHistoryToCOS(data) {
+  const cos = new COS({ SecretId: COS_CONFIG.secretId, SecretKey: COS_CONFIG.secretKey });
+  return new Promise((resolve, reject) => {
+    cos.putObject({
+      Bucket: COS_CONFIG.bucket,
+      Region: COS_CONFIG.region,
+      Key: 'polymarket-history.json',
+      Body: Buffer.from(JSON.stringify(data)),
+      ContentType: 'application/json',
+      ACL: 'public-read'
+    }, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
+
 async function main() {
   try {
     console.log('=== PolyMarket Data Fetcher with Doubao Translation ===');
@@ -265,10 +302,10 @@ async function main() {
     let allMarkets = [];
     const seenIds = new Set();
 
-    // 1. 获取活跃市场
+    // 1. 获取活跃市场（大样本）
     console.log('\n--- 获取活跃市场 ---');
     try {
-      const data = await fetchUrl('https://gamma-api.polymarket.com/markets?closed=false&limit=500');
+      const data = await fetchUrl('https://gamma-api.polymarket.com/markets?closed=false&limit=1000');
       const markets = transformData(data);
       markets.forEach(m => {
         if (!seenIds.has(m.id)) {
@@ -281,34 +318,60 @@ async function main() {
       console.error('❌ 获取活跃市场失败:', e.message);
     }
 
-    // 2. 获取热门市场
-    console.log('\n--- 获取热门市场 ---');
-    try {
-      const data = await fetchUrl('https://gamma-api.polymarket.com/markets?closed=false&limit=300');
-      const markets = transformData(data);
-      markets.forEach(m => {
-        if (!seenIds.has(m.id)) {
-          seenIds.add(m.id);
-          allMarkets.push(m);
-        }
-      });
-      console.log(`✅ 获取 ${markets.length} 条热门市场`);
-    } catch (e) {
-      console.error('❌ 获取热门市场失败:', e.message);
-    }
-
-    // 去重并按交易量排序
-    allMarkets.sort((a, b) => b.volume - a.volume);
-
-    // 只保留前300条最活跃的（减少翻译成本）
-    const topMarkets = allMarkets.slice(0, 300);
-    console.log(`\n📊 筛选前 ${topMarkets.length} 条最活跃市场进行翻译`);
+    // 2. 按概率分层抽样，确保分布均衡
+    console.log('\n--- 按概率分层抽样 ---');
+    const highProb = allMarkets.filter(m => m.probability >= 70);  // 高概率 ≥70%
+    const midProb = allMarkets.filter(m => m.probability >= 40 && m.probability < 70);  // 中概率 40-70%
+    const lowProb = allMarkets.filter(m => m.probability < 40);  // 低概率 <40%
+    
+    console.log(`  原始分布 - 高概率(≥70%): ${highProb.length}条, 中概率(40-70%): ${midProb.length}条, 低概率(<40%): ${lowProb.length}条`);
+    
+    // 分层抽样：确保各层都有足够样本
+    const sampleHigh = highProb.slice(0, 150);  // 取前150条高概率
+    const sampleMid = midProb.slice(0, 150);    // 取前150条中概率  
+    const sampleLow = lowProb.slice(0, 200);    // 取前200条低概率
+    
+    // 合并并按交易量排序
+    let selectedMarkets = [...sampleHigh, ...sampleMid, ...sampleLow];
+    selectedMarkets.sort((a, b) => b.volume - a.volume);
+    
+    console.log(`✅ 分层抽样后: ${selectedMarkets.length}条 (高${sampleHigh.length}/中${sampleMid.length}/低${sampleLow.length})`);
 
     // 3. 批量翻译
     console.log('\n--- 开始豆包API翻译 ---');
-    const translatedMarkets = await batchTranslateMarkets(topMarkets);
+    const translatedMarkets = await batchTranslateMarkets(selectedMarkets);
 
-    // 4. 上传数据
+    // 4. 更新历史数据（用于图表）
+    console.log('\n--- 更新历史数据 ---');
+    let historyData = [];
+    try {
+      const historyUrl = `https://${COS_CONFIG.bucket}.cos.${COS_CONFIG.region}.myqcloud.com/polymarket-history.json`;
+      const historyRes = await fetchUrl(historyUrl);
+      if (Array.isArray(historyRes)) {
+        historyData = historyRes;
+        // 只保留最近30天数据
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        historyData = historyData.filter(h => new Date(h.timestamp) > thirtyDaysAgo);
+      }
+    } catch (e) {
+      console.log('  历史数据不存在或获取失败，创建新历史');
+    }
+    
+    // 添加当前时间点数据（Top 100市场的概率历史）
+    const currentSnapshot = {
+      timestamp: new Date().toISOString(),
+      markets: translatedMarkets.slice(0, 100).map(m => ({
+        id: m.id,
+        question: m.question,
+        questionZh: m.questionZh,
+        probability: m.probability,
+        volume: m.volume
+      }))
+    };
+    historyData.push(currentSnapshot);
+    
+    // 5. 上传数据和历史
     const result = {
       markets: translatedMarkets,
       total: translatedMarkets.length,
@@ -318,6 +381,8 @@ async function main() {
 
     console.log('\n--- 上传到COS ---');
     await uploadToCOS(result);
+    await uploadHistoryToCOS(historyData);
+    console.log(`  已更新历史数据: ${historyData.length} 个时间点`);
 
     console.log('\n=== 完成 ===');
     console.log(`总计: ${translatedMarkets.length} 条已翻译市场数据`);
