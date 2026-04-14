@@ -35,7 +35,7 @@ jobs:
         
     - name: Install dependencies
       run: |
-        npm install axios cos-nodejs-sdk-v5
+        npm install axios cos-nodejs-sdk-v5 --legacy-peer-deps
         
     - name: Fetch Polymarket Data
       run: |
