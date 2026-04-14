@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Debug Secrets
       run: |
         echo "Checking secrets..."
@@ -23,155 +26,7 @@ jobs:
         if [ -z "$COS_SECRET_KEY" ]; then echo "❌ COS_SECRET_KEY is not set"; exit 1; else echo "✅ COS_SECRET_KEY is set"; fi
         if [ -z "$COS_BUCKET" ]; then echo "❌ COS_BUCKET is not set"; exit 1; else echo "✅ COS_BUCKET: $COS_BUCKET"; fi
         if [ -z "$COS_REGION" ]; then echo "❌ COS_REGION is not set"; exit 1; else echo "✅ COS_REGION: $COS_REGION"; fi
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        
-    - name: Install dependencies
+
+    - name: Run Fetch Script
       run: |
-        npm install axios cos-nodejs-sdk-v5 --legacy-peer-deps
-        
-    - name: Fetch Polymarket Data
-      run: |
-        node -e "
-        const axios = require('axios');
-        const fs = require('fs');
-        
-        async function fetchData() {
-          try {
-            console.log('Fetching Polymarket data...');
-            
-            // 尝试多个端点
-            const endpoints = [
-              'https://gamma-api.polymarket.com/events?active=true&closed=false&limit=100',
-              'https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100'
-            ];
-            
-            let data = null;
-            
-            for (const endpoint of endpoints) {
-              try {
-                console.log('Trying endpoint:', endpoint);
-                const response = await axios.get(endpoint, {
-                  timeout: 30000,
-                  headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                  }
-                });
-                
-                if (response.data) {
-                  data = response.data;
-                  console.log('Success! Got data from:', endpoint);
-                  break;
-                }
-              } catch (error) {
-                console.log('Failed:', endpoint, error.message);
-              }
-            }
-            
-            if (data) {
-              // 标准化数据格式
-              let markets = [];
-              if (Array.isArray(data)) {
-                markets = data;
-              } else if (data.events) {
-                markets = data.events;
-              } else if (data.markets) {
-                markets = data.markets;
-              }
-              
-              // 转换数据格式
-              const transformedMarkets = markets.map(item => {
-                const yesPrice = item.outcomePrices?.[0] || 0.5;
-                return {
-                  id: item.id || item.marketId || String(Math.random()),
-                  question: item.question || item.title || 'Unknown',
-                  description: item.description || '',
-                  outcomes: item.outcomes || ['NO', 'YES'],
-                  outcomePrices: item.outcomePrices || [0.5, 0.5],
-                  probability: Math.round(yesPrice * 100),
-                  volume: parseFloat(item.volume || '0'),
-                  liquidity: parseFloat(item.liquidity || '0'),
-                  active: item.active !== false,
-                  closed: item.closed === true,
-                  tags: Array.isArray(item.tags) ? item.tags : [],
-                  slug: item.slug || '',
-                  createdAt: item.creationTime || new Date().toISOString(),
-                  expiresAt: item.expirationTime || '',
-                  updatedAt: new Date().toISOString()
-                };
-              });
-              
-              // 保存到文件
-              const result = {
-                markets: transformedMarkets,
-                total: transformedMarkets.length,
-                fetchedAt: new Date().toISOString(),
-                source: 'polymarket-gamma-api'
-              };
-              
-              fs.writeFileSync('polymarket-data.json', JSON.stringify(result, null, 2));
-              console.log('Data saved:', transformedMarkets.length, 'markets');
-            } else {
-              console.error('Failed to fetch data from all endpoints');
-              process.exit(1);
-            }
-          } catch (error) {
-            console.error('Error:', error.message);
-            process.exit(1);
-          }
-        }
-        
-        fetchData();
-        "
-        
-    - name: Upload to Tencent COS
-      run: |
-        node -e "
-        const COS = require('cos-nodejs-sdk-v5');
-        const fs = require('fs');
-        
-        async function upload() {
-          try {
-            const cos = new COS({
-              SecretId: process.env.COS_SECRET_ID,
-              SecretKey: process.env.COS_SECRET_KEY
-            });
-            
-            console.log('Uploading to COS...');
-            console.log('Bucket:', process.env.COS_BUCKET);
-            console.log('Region:', process.env.COS_REGION);
-            
-            const result = await cos.putObject({
-              Bucket: process.env.COS_BUCKET,
-              Region: process.env.COS_REGION,
-              Key: 'polymarket-data.json',
-              Body: fs.readFileSync('polymarket-data.json'),
-              ContentType: 'application/json',
-              ACL: 'public-read'  // 设置公共读取权限
-            });
-            
-            console.log('Upload success!');
-            console.log('ETag:', result.ETag);
-            console.log('URL: https://' + process.env.COS_BUCKET + '.cos.' + process.env.COS_REGION + '.myqcloud.com/polymarket-data.json');
-          } catch (error) {
-            console.error('Upload failed:', error.message);
-            process.exit(1);
-          }
-        }
-        
-        upload();
-        "
-        
-    - name: Verify upload
-      run: |
-        echo "Data fetch and upload completed at $(date)"
-        ls -lh polymarket-data.json
-        head -c 500 polymarket-data.json
+        node scripts/fetch-polymarket.js
