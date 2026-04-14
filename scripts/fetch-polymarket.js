@@ -1,16 +1,9 @@
 #!/usr/bin/env node
 
-/**
- * PolyMarket Data Fetcher
- * 用于GitHub Actions的独立脚本
- * 功能：抓取数据、翻译为中文、上传到腾讯云COS
- */
-
 import COS from 'cos-nodejs-sdk-v5';
 import https from 'https';
 import fs from 'fs';
 
-// COS配置
 const COS_CONFIG = {
   secretId: process.env.COS_SECRET_ID,
   secretKey: process.env.COS_SECRET_KEY,
@@ -18,7 +11,6 @@ const COS_CONFIG = {
   region: process.env.COS_REGION
 };
 
-// 中文翻译字典
 const TRANSLATIONS = {
   categories: {
     'Finance': '金融', 'Crypto': '加密货币', 'Politics': '政治',
@@ -67,27 +59,14 @@ function fetchUrl(url) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error(`JSON解析失败: ${e.message}`)); }
+        catch (e) { reject(new Error(`JSON解析失败`)); }
       });
-    }).on('error', reject).on('timeout', (req) => {
-      req.destroy();
-      reject(new Error('请求超时'));
-    }).setTimeout(30000);
+    }).on('error', reject).setTimeout(30000, () => reject(new Error('超时')));
   });
-}
-
-// 计算概率
-function calculateProbability(outcomePrices) {
-  if (!outcomePrices || outcomePrices.length < 2) return 50;
-  // outcomePrices[0] = NO价格, outcomePrices[1] = YES价格
-  // YES价格直接就是概率（0-1范围）
-  const yesPrice = parseFloat(outcomePrices[1]) || 0.5;
-  return Math.round(yesPrice * 100);
 }
 
 function transformData(rawData) {
   let markets = Array.isArray(rawData) ? rawData : (rawData.events || rawData.markets || []);
-  
   console.log(`原始数据量: ${markets.length}`);
   
   return markets.map(item => {
@@ -95,14 +74,13 @@ function transformData(rawData) {
     const yesPrice = parseFloat(outcomePrices[1]) || 0.5;
     const probability = Math.round(yesPrice * 100);
     
-    const originalQuestion = item.question || item.title || 'Unknown';
-    const originalTag = item.tags?.[0] || '';
-    const tagLabel = typeof originalTag === 'object' ? originalTag?.label : originalTag;
+    const tag = item.tags?.[0] || '';
+    const tagLabel = typeof tag === 'object' ? tag?.label : tag;
     
     return {
       id: item.id || item.conditionId || String(Date.now() + Math.random()),
-      question: originalQuestion,
-      questionZh: translateToChinese(originalQuestion),
+      question: item.question || 'Unknown',
+      questionZh: translateToChinese(item.question || ''),
       outcomes: item.outcomes || ['NO', 'YES'],
       outcomePrices: outcomePrices,
       probability: probability,
@@ -119,11 +97,11 @@ function transformData(rawData) {
 }
 
 async function uploadToCOS(data) {
-  const { secretId, secretKey, bucket, region } = COS_CONFIG;
+  const cos = new COS({ SecretId: COS_CONFIG.secretId, SecretKey: COS_CONFIG.secretKey });
   return new Promise((resolve, reject) => {
-    const cos = new COS({ SecretId: secretId, SecretKey: secretKey });
     cos.putObject({
-      Bucket: bucket, Region: region, Key: 'polymarket-data.json',
+      Bucket: COS_CONFIG.bucket, Region: COS_CONFIG.region,
+      Key: 'polymarket-data.json',
       Body: Buffer.from(JSON.stringify(data)),
       ContentType: 'application/json', ACL: 'public-read'
     }, (err, result) => err ? reject(err) : resolve(result));
@@ -133,68 +111,48 @@ async function uploadToCOS(data) {
 async function main() {
   try {
     console.log('=== PolyMarket Data Fetcher ===');
-    console.log('Bucket:', COS_CONFIG.bucket);
-    
-    // 尝试多个API端点
+    let rawData = null;
     const endpoints = [
       'https://gamma-api.polymarket.com/markets?closed=false&limit=200',
       'https://gamma-api.polymarket.com/events?active=true&closed=false&limit=200',
     ];
     
-    let rawData = null;
     for (const endpoint of endpoints) {
       try {
         rawData = await fetchUrl(endpoint);
-        if (rawData && (Array.isArray(rawData) || rawData.markets || rawData.events)) {
-          console.log('API响应成功!');
-          break;
-        }
-      } catch (e) {
-        console.log(`端点失败: ${e.message}`);
-      }
+        if (rawData) { console.log('API响应成功!'); break; }
+      } catch (e) { console.log(`失败: ${e.message}`); }
     }
     
     if (!rawData) throw new Error('所有API端点都失败');
     
-    // 转换数据
     const markets = transformData(rawData);
     
     // 统计概率分布
     const probStats = {};
     markets.forEach(m => {
-      const p = m.probability;
+      const p = String(m.probability);
       probStats[p] = (probStats[p] || 0) + 1;
     });
     
-    console.log('\n概率分布统计:');
+    console.log('\n概率分布:');
     Object.keys(probStats).sort((a, b) => parseInt(b) - parseInt(a)).slice(0, 10).forEach(p => {
       console.log(`  ${p}%: ${probStats[p]}条`);
     });
     
-    // 示例
     console.log('\n示例数据:');
     markets.slice(0, 3).forEach(m => {
       console.log(`  ${m.questionZh || m.question}`);
-      console.log(`    概率: ${m.probability}%, 价格: [${m.outcomePrices}], 分类: ${m.categoryZh}`);
+      console.log(`    概率: ${m.probability}% 价格: [${m.outcomePrices}] 分类: ${m.categoryZh}`);
     });
     
-    const result = {
-      markets,
-      total: markets.length,
-      fetchedAt: new Date().toISOString(),
-      source: 'polymarket-gamma-api',
-      translated: true
-    };
-    
-    // 保存本地
+    const result = { markets, total: markets.length, fetchedAt: new Date().toISOString(), source: 'polymarket-gamma-api', translated: true };
     fs.writeFileSync('polymarket-data.json', JSON.stringify(result, null, 2));
     console.log('\n数据已保存到本地');
     
-    // 上传COS
     await uploadToCOS(result);
     console.log('上传COS成功!');
-    console.log(`URL: https://${COS_CONFIG.bucket}.cos.${COS_CONFIG.region}.myqcloud.com/polymarket-data.json');
-    
+    console.log(`URL: https://${COS_CONFIG.bucket}.cos.${COS_CONFIG.region}.myqcloud.com/polymarket-data.json`);
   } catch (error) {
     console.error('错误:', error.message);
     process.exit(1);
