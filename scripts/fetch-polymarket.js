@@ -172,7 +172,7 @@ function transformData(rawData, source = 'gamma') {
 }
 
 async function uploadToCOS(data) {
-  const cos = new COS({ SecretId: COS_CONFIG.secretId, SecretKey: COS_SECRET_KEY });
+  const cos = new COS({ SecretId: COS_CONFIG.secretId, SecretKey: COS_CONFIG.secretKey });
   return new Promise((resolve, reject) => {
     cos.putObject({
       Bucket: COS_CONFIG.bucket, Region: COS_CONFIG.region,
