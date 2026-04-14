@@ -148,33 +148,17 @@ const SettingsPage = () => {
 
   const handleImportFavorites = async () => {
     try {
-      // 先打开弹窗显示加载状态
-      setShowImportDialog(true)
-      setAllEvents([]) // 清空之前的数据
-
       // 获取所有可用事件（手动构建query参数）
       const res = await Network.request({
         url: '/api/market/events?page=1&pageSize=50'
       })
 
       if (res.data?.code === 200) {
-        const events = res.data.data?.events || []
-        setAllEvents(events)
+        setAllEvents(res.data.data.events || [])
         // 初始化选中状态：已收藏的默认选中
         const favoriteIds = new Set(favorites.map(f => f.id))
         setSelectedEvents(favoriteIds)
-
-        if (events.length === 0) {
-          showToast({
-            title: '暂无可用事件',
-            icon: 'none'
-          })
-        }
-      } else {
-        showToast({
-          title: '加载失败',
-          icon: 'none'
-        })
+        setShowImportDialog(true)
       }
     } catch (error) {
       console.error('加载事件失败:', error)
@@ -479,26 +463,11 @@ const SettingsPage = () => {
       {/* 导入收藏弹窗 */}
       {showImportDialog && (
         <View
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50"
           onClick={() => setShowImportDialog(false)}
         >
           <View
-            className="bg-white rounded-t-2xl w-full"
-            style={{
-              maxHeight: '70vh',
-              padding: '16px'
-            }}
+            className="bg-white rounded-t-2xl w-full max-h-[70vh] p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <View className="flex items-center justify-between mb-4">
@@ -506,72 +475,64 @@ const SettingsPage = () => {
               <Download size={20} strokeWidth={2} color="#666" />
             </View>
 
-            <ScrollView scrollY className="h-[50vh] mb-4" style={{ minHeight: '300px' }}>
-              {allEvents.length === 0 ? (
-                <View className="flex items-center justify-center h-full py-12">
-                  <Text className="block text-sm text-gray-500 text-center">
-                    {isImporting ? '加载中...' : '暂无可用事件\n请检查网络连接'}
-                  </Text>
-                </View>
-              ) : (
-                <View className="space-y-2">
-                  {allEvents.map((event) => (
-                    <View
-                      key={event.id}
-                      className={`rounded-lg p-3 border-2 ${
-                        selectedEvents.has(event.id)
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200'
-                      }`}
-                      onClick={() => {
-                        setSelectedEvents(prev => {
-                          const newSet = new Set(prev)
-                          if (newSet.has(event.id)) {
-                            newSet.delete(event.id)
-                          } else {
-                            newSet.add(event.id)
-                          }
-                          return newSet
-                        })
-                      }}
-                    >
-                      <View className="flex items-start gap-3">
-                        <View
-                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+            <ScrollView scrollY className="max-h-[50vh] mb-4">
+              <View className="space-y-2">
+                {allEvents.map((event) => (
+                  <View
+                    key={event.id}
+                    className={`rounded-lg p-3 border-2 ${
+                      selectedEvents.has(event.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200'
+                    }`}
+                    onClick={() => {
+                      setSelectedEvents(prev => {
+                        const newSet = new Set(prev)
+                        if (newSet.has(event.id)) {
+                          newSet.delete(event.id)
+                        } else {
+                          newSet.add(event.id)
+                        }
+                        return newSet
+                      })
+                    }}
+                  >
+                    <View className="flex items-start gap-3">
+                      <View
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          selectedEvents.has(event.id)
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-300'
+                        }`}
+                      >
+                        {selectedEvents.has(event.id) && (
+                          <Check size={12} strokeWidth={3} color="#fff" />
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text
+                          className={`block text-sm font-medium mb-1 ${
                             selectedEvents.has(event.id)
-                              ? 'border-blue-500 bg-blue-500'
-                              : 'border-gray-300'
+                              ? 'text-blue-700'
+                              : 'text-gray-900'
                           }`}
                         >
-                          {selectedEvents.has(event.id) && (
-                            <Check size={12} strokeWidth={3} color="#fff" />
-                          )}
-                        </View>
-                        <View className="flex-1">
-                          <Text
-                            className={`block text-sm font-medium mb-1 ${
-                              selectedEvents.has(event.id)
-                                ? 'text-blue-700'
-                                : 'text-gray-900'
-                            }`}
-                          >
-                            {event.question}
-                          </Text>
-                          <Text
-                            className={`block text-xs ${
-                              selectedEvents.has(event.id)
-                                ? 'text-blue-600'
-                                : 'text-gray-500'
-                            }`}
-                          >
-                            {event.probability.toFixed(1)}% · {event.category}
-                          </Text>
-                        </View>
+                          {event.question}
+                        </Text>
+                        <Text
+                          className={`block text-xs ${
+                            selectedEvents.has(event.id)
+                              ? 'text-blue-600'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          {event.probability.toFixed(1)}% · {event.category}
+                        </Text>
                       </View>
                     </View>
-                  ))}
-                </View>
-              )}
+                  </View>
+                ))}
+              </View>
             </ScrollView>
 
             <View className="flex gap-3">
