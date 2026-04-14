@@ -1,12 +1,139 @@
-import { View, Text, ScrollView } from '@tarojs/components'
+import { View, Text, ScrollView, Canvas } from '@tarojs/components'
 import Taro, { useLoad, useRouter } from '@tarojs/taro'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Network } from '@/network'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Star } from 'lucide-react-taro'
 import './index.config'
+
+// 时间范围选项
+const timeRanges = [
+  { label: '1小时', value: '1h', hours: 1 },
+  { label: '6小时', value: '6h', hours: 6 },
+  { label: '1天', value: '1d', hours: 24 },
+  { label: '1周', value: '1w', hours: 168 },
+  { label: '1个月', value: '1m', hours: 720 },
+  { label: '全部', value: 'all', hours: 0 }
+]  
+
+// 图表组件  
+const ProbabilityChart = ({  
+  data,  
+  width = 350,  
+  height = 200  
+}: {  
+  data: Array<{ date: string; probability: number }>  
+  width?: number  
+  height?: number  
+}) => {  
+  const canvasId = 'probability-chart'  
+  
+  const drawChart = useCallback(() => {  
+    if (!data || data.length === 0) return  
+    
+    const ctx = Taro.createCanvasContext(canvasId)  
+    if (!ctx) return  
+    
+    const padding = { top: 20, right: 50, bottom: 30, left: 10 }  
+    const chartWidth = width - padding.left - padding.right  
+    const chartHeight = height - padding.top - padding.bottom  
+    
+    // 清空画布  
+    ctx.clearRect(0, 0, width, height)  
+    
+    // 获取数据范围  
+    const probabilities = data.map(d => d.probability)  
+    const minProb = Math.min(...probabilities) * 0.8  
+    const maxProb = Math.max(...probabilities) * 1.1  
+    const probRange = maxProb - minProb || 1  
+    
+    // 绘制网格线  
+    ctx.setStrokeStyle('#f0f0f0')  
+    ctx.setLineWidth(1)  
+    for (let i = 0; i <= 4; i++) {  
+      const y = padding.top + (chartHeight / 4) * i  
+      ctx.beginPath()  
+      ctx.moveTo(padding.left, y)  
+      ctx.lineTo(padding.left + chartWidth, y)  
+      ctx.stroke()  
+    }  
+    
+    // 绘制折线  
+    ctx.setStrokeStyle('#3b82f6')  
+    ctx.setLineWidth(2)  
+    ctx.beginPath()  
+    
+    data.forEach((item, index) => {  
+      const x = padding.left + (index / (data.length - 1)) * chartWidth  
+      const y = padding.top + chartHeight - ((item.probability - minProb) / probRange) * chartHeight  
+      
+      if (index === 0) {  
+        ctx.moveTo(x, y)  
+      } else {  
+        ctx.lineTo(x, y)  
+      }  
+    })  
+    
+    ctx.stroke()  
+    
+    // 绘制数据点  
+    data.forEach((item, index) => {  
+      const x = padding.left + (index / (data.length - 1)) * chartWidth  
+      const y = padding.top + chartHeight - ((item.probability - minProb) / probRange) * chartHeight  
+      
+      ctx.beginPath()  
+      ctx.arc(x, y, 4, 0, Math.PI * 2)  
+      ctx.setFillStyle('#3b82f6')  
+      ctx.fill()  
+      
+      // 白色边框  
+      ctx.setStrokeStyle('#ffffff')  
+      ctx.setLineWidth(2)  
+      ctx.stroke()  
+    })  
+    
+    // 绘制右侧Y轴标签  
+    ctx.setFillStyle('#9ca3af')  
+    ctx.setFontSize(10)  
+    ctx.setTextAlign('left')  
+    for (let i = 0; i <= 4; i++) {  
+      const value = maxProb - (probRange / 4) * i  
+      const y = padding.top + (chartHeight / 4) * i + 3  
+      ctx.fillText(`${Math.round(value)}%`, padding.left + chartWidth + 5, y)  
+    }  
+    
+    // 绘制底部X轴日期标签（只显示首尾和中间）  
+    ctx.setFillStyle('#9ca3af')  
+    ctx.setFontSize(10)  
+    ctx.setTextAlign('center')  
+    
+    const showIndices = [0, Math.floor(data.length / 2), data.length - 1]  
+    showIndices.forEach(index => {  
+      if (index < data.length) {  
+        const x = padding.left + (index / (data.length - 1)) * chartWidth  
+        const date = new Date(data[index].date)  
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`  
+        ctx.fillText(dateStr, x, height - 5)  
+      }  
+    })  
+    
+    ctx.draw()  
+  }, [data, width, height])  
+  
+  useEffect(() => {  
+    drawChart()  
+  }, [drawChart])  
+  
+  return (  
+    <Canvas  
+      canvasId={canvasId}  
+      style={{ width: `${width}px`, height: `${height}px` }}  
+      className="w-full"  
+    />  
+  )  
+}
 
 interface MarketEvent {
   id: string
@@ -26,6 +153,7 @@ const DetailPage = () => {
   const [loading, setLoading] = useState(true)
   const [favorited, setFavorited] = useState(false)
   const [historyData, setHistoryData] = useState<Array<{ date: string; probability: number }>>([])
+  const [selectedTimeRange, setSelectedTimeRange] = useState('1w')
 
   useLoad(() => {
     const { id } = router.params
@@ -282,42 +410,69 @@ const DetailPage = () => {
         </View>
       </View>
 
-      {/* 7 日走势图 */}
+      {/* 概率走势图 */}
       <Card className="m-4">
-        <CardHeader>
-          <CardTitle className="text-base">📈 7日走势</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Text className="block">📈 概率走势</Text>
+          </CardTitle>
         </CardHeader>
-        <CardContent className="p-4">
-          <View className="space-y-3">
-            {event.history7Days?.map((item, index) => {
-              const isToday = index === (event.history7Days?.length || 0) - 1
-              const date = new Date(item.date)
-              const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
-
-              return (
-                <View key={item.date} className="flex items-center gap-3">
-                  <Text className={`block text-xs w-12 ${isToday ? 'font-bold text-blue-600' : 'text-gray-500'}`}>
-                    {dateStr}{isToday ? ' (今)' : ''}
-                  </Text>
-                  <View className="flex-1">
-                    <Progress
-                      value={item.probability}
-                      className="h-2"
-                      style={{
-                        '--progress-background': getProbabilityColor(item.probability)
-                      } as any}
-                    />
-                  </View>
-                  <Text
-                    className={`block text-xs w-12 text-right ${isToday ? 'font-bold' : 'text-gray-600'}`}
-                    style={{ color: getProbabilityColor(item.probability) }}
-                  >
-                    {item.probability.toFixed(1)}%
-                  </Text>
+        <CardContent className="p-4 pt-0">
+          {/* 时间范围选择器 */}
+          <ScrollView
+            scrollX
+            className="mb-4"
+            showScrollbar={false}
+          >
+            <View className="flex flex-row gap-2">
+              {timeRanges.map((range) => (
+                <View
+                  key={range.value}
+                  onClick={() => setSelectedTimeRange(range.value)}
+                  className={`px-3 py-2 rounded-full text-sm whitespace-nowrap transition-all ${
+                    selectedTimeRange === range.value
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  <Text className="block">{range.label}</Text>
                 </View>
-              )
-            })}
+              ))}
+            </View>
+          </ScrollView>
+          
+          {/* 图表区域 */}
+          <View className="h-52 flex items-center justify-center">
+            {(() => {
+              // 根据选择的时间范围过滤数据
+              const now = new Date()
+              const filteredData = historyData.filter(item => {
+                const range = timeRanges.find(r => r.value === selectedTimeRange)
+                if (!range || range.hours === 0) return true
+                const itemDate = new Date(item.date)
+                const hoursDiff = (now.getTime() - itemDate.getTime()) / (1000 * 60 * 60)
+                return hoursDiff <= range.hours
+              })
+              
+              if (filteredData.length === 0) {
+                return (
+                  <Text className="block text-sm text-gray-400">暂无数据</Text>
+                )
+              }
+              
+              return <ProbabilityChart data={filteredData} width={330} height={200} />
+            })()}
           </View>
+          
+          {/* 当前概率显示 */}
+          {historyData.length > 0 && (
+            <View className="mt-4 flex items-center justify-between px-2">
+              <Text className="block text-sm text-gray-500">当前概率</Text>
+              <Text className="block text-2xl font-bold text-blue-600">
+                {historyData[historyData.length - 1]?.probability.toFixed(1)}%
+              </Text>
+            </View>
+          )}
         </CardContent>
       </Card>
 
