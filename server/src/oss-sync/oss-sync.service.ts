@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { translateCategory, formatProbability, formatVolume } from '../common/translation'
+import { translateCategory, translateToChinese, formatProbability, formatVolume } from '../common/translation'
 
 export interface PolymarketData {
   markets: any[]
@@ -53,17 +53,28 @@ export class OssSyncService {
     // 翻译分类
     const categoryZh = translateCategory(tagLabel || '')
 
-    // 获取概率
-    const probability = parseFloat(market.outcomePrices?.[1]) || market.probability || 50
-    const probabilityNum = typeof probability === 'string' ? parseFloat(probability) : probability
+    // 解析概率 - outcomePrices 可能是 JSON 字符串或数组
+    let probabilityNum = 50
+    try {
+      const prices = typeof market.outcomePrices === 'string' 
+        ? JSON.parse(market.outcomePrices) 
+        : market.outcomePrices
+      if (Array.isArray(prices) && prices.length > 0) {
+        // outcomePrices[0] 是 YES 价格（0-1之间的小数，如0.545表示54.5%）
+        probabilityNum = parseFloat(prices[0]) * 100
+      }
+    } catch (e) {
+      // fallback
+    }
 
     return {
       ...market,
-      // 添加中文分类
+      // 添加中文翻译
+      questionZh: translateToChinese(market.question || ''),
       categoryZh,
       // 添加格式化字段
-      probabilityZh: formatProbability(probabilityNum * 100),
-      probabilityRaw: probabilityNum * 100,
+      probabilityZh: formatProbability(probabilityNum),
+      probabilityRaw: probabilityNum,
       volumeZh: formatVolume(market.volume),
       liquidityZh: formatVolume(market.liquidity),
     }

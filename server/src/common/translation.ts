@@ -1,6 +1,6 @@
 /**
  * 翻译工具模块
- * 提供简单的中英文翻译功能
+ * 提供中英文翻译功能
  */
 
 // 常用分类标签翻译
@@ -32,121 +32,166 @@ const categoryTranslations: Record<string, string> = {
   'Energy': '能源',
 }
 
-// 常见问题关键词翻译
+// 常见问题关键词翻译（使用原始大小写）
 const keywordTranslations: Record<string, string> = {
-  'bitcoin': '比特币',
-  'btc': '比特币',
-  'ethereum': '以太坊',
-  'eth': '以太坊',
+  // 人物
+  'Trump': '特朗普',
   'trump': '特朗普',
+  'Biden': '拜登',
   'biden': '拜登',
-  'fed': '美联储',
-  'rate': '利率',
-  'price': '价格',
-  'will': '会',
-  'by': '到',
-  'before': '之前',
-  'after': '之后',
-  'higher': '更高',
-  'lower': '更低',
-  'above': '超过',
-  'below': '低于',
-  'target': '目标',
-  'million': '百万',
-  'billion': '十亿',
-  'percent': '百分之',
-  'day': '天',
-  'week': '周',
-  'month': '月',
-  'year': '年',
-  'election': '选举',
+  'Obama': '奥巴马',
+  'obama': '奥巴马',
+  'President': '总统',
   'president': '总统',
-  'court': '法院',
-  'supreme': '最高',
-  'republican': '共和党',
-  'democrat': '民主党',
-  'congress': '国会',
-  'senate': '参议院',
-  'house': '众议院',
+  'CEO': '首席执行官',
+  // 加密货币
+  'Bitcoin': '比特币',
+  'bitcoin': '比特币',
+  'BTC': '比特币',
+  'btc': '比特币',
+  'Ethereum': '以太坊',
+  'ethereum': '以太坊',
+  'ETH': '以太坊',
+  'eth': '以太坊',
+  'Coinbase': 'Coinbase交易所',
+  'crypto': '加密',
+  'Crypto': '加密货币',
+  // 金融
+  'stock': '股票',
+  'Stock': '股票',
+  'market': '市场',
+  'Market': '市场',
+  'inflation': '通胀',
+  'Inflation': '通胀',
+  'GDP': 'GDP',
+  'gdp': 'GDP',
+  'Fed': '美联储',
+  'fed': '美联储',
+  'recession': '衰退',
+  'Recession': '衰退',
+  'unemployment': '失业',
+  // 体育
+  'NBA': 'NBA',
   'nba': 'NBA',
+  'NFL': 'NFL',
+  'nfl': 'NFL',
+  'Super Bowl': '超级碗',
   'football': '橄榄球',
+  'Football': '橄榄球',
   'soccer': '足球',
   'baseball': '棒球',
-  'trade war': '贸易战',
-  'inflation': '通胀',
-  'recession': '衰退',
-  'gdp': 'GDP',
-  'unemployment': '失业',
-  'stock': '股票',
-  'market': '市场',
-  'tesla': '特斯拉',
-  'apple': '苹果',
-  'amazon': '亚马逊',
-  'google': '谷歌',
-  'microsoft': '微软',
-  'meta': 'Meta',
-  'facebook': 'Facebook',
-  'openai': 'OpenAI',
-  'ai': 'AI',
-  'china': '中国',
-  'russia': '俄罗斯',
-  'ukraine': '乌克兰',
-  'israel': '以色列',
-  'iran': '伊朗',
-  'north korea': '朝鲜',
-  'taiwan': '台湾',
-  'sanctions': '制裁',
-  'war': '战争',
-  'peace': '和平',
-  'deal': '协议',
-  'agreement': '协议',
-  'summit': '峰会',
-  'meeting': '会议',
-  'announcement': '公告',
-  'report': '报告',
-  'earnings': '财报',
-  'revenue': '营收',
-  'profit': '利润',
-  'launch': '发布',
-  'launched': '已发布',
-  'approve': '批准',
-  'approved': '已批准',
-  'reject': '拒绝',
-  'rejected': '已拒绝',
-  'ban': '禁令',
-  'banned': '已禁止',
-  'legal': '合法',
-  'illegal': '非法',
-  'governor': '州长',
-  'mayor': '市长',
-  'senator': '参议员',
-  'representative': '众议员',
-  'judge': '法官',
-  'ceo': 'CEO',
-  'millionaire': '百万富翁',
-  'billionaire': '亿万富翁',
-  'celebrity': '名人',
-  'movie': '电影',
-  'oscar': '奥斯卡',
-  'grammy': '格莱美',
-  'award': '奖项',
-  'series': '系列',
-  'season': '赛季',
   'championship': '冠军',
+  'Championship': '冠军',
   'finals': '决赛',
+  'Finals': '决赛',
   'playoffs': '季后赛',
+  'Playoffs': '季后赛',
+  'MVP': 'MVP',
   'mvp': 'MVP',
-  'gold': '金牌',
-  'silver': '银牌',
-  'bronze': '铜牌',
+  'Olympics': '奥运会',
   'olympics': '奥运会',
-  'world cup': '世界杯',
-  'temperature': '温度',
-  'hurricane': '飓风',
-  'earthquake': '地震',
-  'flood': '洪水',
-  'fire': '火灾',
-  'storm': '风暴',
+  'World Cup': '世界杯',
+  'World cup': '世界杯',
+  // 科技
+  'AI': 'AI',
+  'GPT': 'GPT',
+  'Tesla': '特斯拉',
+  'Apple': '苹果',
+  'Google': '谷歌',
+  'Microsoft': '微软',
+  'Amazon': '亚马逊',
+  'Meta': 'Meta',
+  'launch': '发布',
+  'Launch': '发布',
+  'approve': '批准',
+  'Approve': '批准',
+  'release': '发布',
+  'Release': '发布',
+  // 音乐/娱乐
+  'album': '专辑',
+  'Album': '专辑',
+  'concert': '演唱会',
+  'Concert': '演唱会',
+  'Rihanna': '蕾哈娜',
+  'Celsius': '摄氏温度',
+  'GTA': 'GTA',
+  // 地缘政治
+  'Russia': '俄罗斯',
+  'russia': '俄罗斯',
+  'Ukraine': '乌克兰',
+  'ukraine': '乌克兰',
+  'China': '中国',
+  'china': '中国',
+  'Iran': '伊朗',
+  'iran': '伊朗',
+  'Israel': '以色列',
+  'israel': '以色列',
+  'war': '战争',
+  'War': '战争',
+  'treaty': '条约',
+  'Treaty': '条约',
+  'agreement': '协议',
+  'Agreement': '协议',
+  'deal': '协议',
+  'Deal': '协议',
+  'sanctions': '制裁',
+  'Ceasefire': '停火',
+  'ceasefire': '停火',
+  // 其他
+  'price': '价格',
+  'Price': '价格',
+  'higher': '更高',
+  'Higher': '更高',
+  'lower': '更低',
+  'Lower': '更低',
+  'above': '超过',
+  'Below': '低于',
+  'below': '低于',
+  'million': '百万',
+  'Million': '百万',
+  'billion': '十亿',
+  'Billion': '十亿',
+  'before': '之前',
+  'Before': '之前',
+  'after': '之后',
+  'After': '之后',
+  'return': '回归',
+  'Return': '回归',
+  'out': '下台',
+  'Out': '下台',
+  'election': '选举',
+  'Election': '选举',
+  'vote': '投票',
+  'Vote': '投票',
+  'court': '法院',
+  'Court': '法院',
+  'supreme': '最高',
+  'Supreme': '最高',
+  'congress': '国会',
+  'Congress': '国会',
+  'senate': '参议院',
+  'Senate': '参议院',
+}
+
+/**
+ * 翻译文本为中文
+ */
+export function translateToChinese(text: string): string {
+  if (!text) return ''
+
+  let translated = text
+
+  // 按关键词长度降序替换（避免短词替换后影响长词匹配）
+  const sortedKeywords = Object.keys(keywordTranslations).sort((a, b) => b.length - a.length)
+
+  for (const eng of sortedKeywords) {
+    const chn = keywordTranslations[eng]
+    // 使用正则表达式，匹配完整单词
+    const regex = new RegExp(`\\b${eng}\\b`, 'g')
+    translated = translated.replace(regex, chn)
+  }
+
+  return translated
 }
 
 /**
@@ -155,7 +200,7 @@ const keywordTranslations: Record<string, string> = {
 export function translateCategory(category: string): string {
   if (!category) return '其他'
 
-  const normalized = category.trim()
+  const normalized = String(category).trim()
 
   // 直接匹配
   if (categoryTranslations[normalized]) {
@@ -170,31 +215,14 @@ export function translateCategory(category: string): string {
   }
 
   // 部分匹配
-  const lowerCategory = normalized.toLowerCase()
+  const lower = normalized.toLowerCase()
   for (const [key, value] of Object.entries(categoryTranslations)) {
-    if (lowerCategory.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerCategory)) {
+    if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
       return value
     }
   }
 
   return normalized
-}
-
-/**
- * 翻译问题文本（基础版，仅翻译关键词）
- */
-export function translateQuestion(question: string): string {
-  if (!question) return ''
-
-  let translated = question
-
-  // 替换常见关键词
-  for (const [key, value] of Object.entries(keywordTranslations)) {
-    const regex = new RegExp(`\\b${key}\\b`, 'gi')
-    translated = translated.replace(regex, value)
-  }
-
-  return translated
 }
 
 /**
