@@ -12,9 +12,10 @@ import { PolymarketGoldskyModule } from './polymarket-goldsky/polymarket-goldsky
 import { PolymarketDuneModule } from './polymarket-dune/polymarket-dune.module';
 import { PolymarketProxyModule } from './polymarket-proxy/polymarket-proxy.module';
 import { PolymarketRealtimeModule } from './polymarket-realtime/polymarket-realtime.module';
+import { OssSyncModule } from './oss-sync/oss-sync.module';
 
 @Module({
-  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule, PolymarketModule, AuthModule, ScheduleModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule],
+  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule, PolymarketModule, AuthModule, ScheduleModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule, OssSyncModule],
   controllers: [AppController],
   providers: [AppService],
 })

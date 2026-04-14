@@ -33,7 +33,7 @@ const IndexPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('全部')
   const [selectedSort, setSelectedSort] = useState('probability_desc')
   const [hasMore, setHasMore] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
+  const [, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
 
@@ -71,24 +71,60 @@ const IndexPage = () => {
   const loadEvents = async () => {
     try {
       setLoading(true)
+      // 使用OSS同步端点获取真实市场数据
       const res = await Network.request({
-        url: '/api/market/events',
-        data: {
-          category: selectedCategory === '全部' ? 'all' : selectedCategory,
-          page: currentPage,
-          pageSize: 10,
-          sort: selectedSort
-        }
+        url: '/api/polymarket-oss/markets'
       })
 
-      console.log('API Response:', res.data)
+      console.log('OSS API Response:', res.data)
 
       if (res.data?.code === 200) {
-        setEvents(res.data.data || [])
-        setPagination(res.data.pagination || null)
-        setHasMore(
-          res.data.pagination ? res.data.pagination.page < res.data.pagination.totalPages : false
-        )
+        // 转换OSS数据格式为前端格式
+        const rawMarkets = res.data.data || []
+        const formattedEvents = rawMarkets.map((m: any) => ({
+          id: m.id,
+          question: m.question,
+          probability: m.probability,
+          price: m.outcomePrices?.[1] || m.probability / 100,
+          volume24h: m.volume,
+          liquidity: m.liquidity,
+          category: m.tags?.[0] || '其他',
+          change24h: 0 // OSS数据暂不提供24h变化
+        }))
+
+        // 根据类别筛选
+        let filteredEvents = formattedEvents
+        if (selectedCategory !== '全部') {
+          if (selectedCategory === '热榜') {
+            filteredEvents = formattedEvents.sort((a: MarketEvent, b: MarketEvent) => b.volume24h - a.volume24h)
+          } else {
+            filteredEvents = formattedEvents.filter((e: MarketEvent) =>
+              e.category.includes(selectedCategory)
+            )
+          }
+        }
+
+        // 根据排序选项排序
+        switch (selectedSort) {
+          case 'probability_desc':
+            filteredEvents.sort((a: MarketEvent, b: MarketEvent) => b.probability - a.probability)
+            break
+          case 'probability_asc':
+            filteredEvents.sort((a: MarketEvent, b: MarketEvent) => a.probability - b.probability)
+            break
+          case 'volume_desc':
+            filteredEvents.sort((a: MarketEvent, b: MarketEvent) => b.volume24h - a.volume24h)
+            break
+        }
+
+        setEvents(filteredEvents)
+        setPagination({
+          total: filteredEvents.length,
+          page: 1,
+          pageSize: filteredEvents.length,
+          totalPages: 1
+        })
+        setHasMore(false)
       }
     } catch (error) {
       console.error('加载失败:', error)
@@ -102,38 +138,13 @@ const IndexPage = () => {
   }
 
   const loadMore = async () => {
-    try {
-      setLoading(true)
-      const nextPage = currentPage + 1
-      const res = await Network.request({
-        url: '/api/market/events',
-        data: {
-          category: selectedCategory === '全部' ? 'all' : selectedCategory,
-          page: nextPage,
-          pageSize: 10,
-          sort: selectedSort
-        }
-      })
-
-      console.log('Load More Response:', res.data)
-
-      if (res.data?.code === 200) {
-        setEvents([...events, ...(res.data.data || [])])
-        setCurrentPage(nextPage)
-        setPagination(res.data.pagination || null)
-        setHasMore(
-          res.data.pagination ? res.data.pagination.page < res.data.pagination.totalPages : false
-        )
-      }
-    } catch (error) {
-      console.error('加载更多失败:', error)
-      Taro.showToast({
-        title: '加载失败',
-        icon: 'none'
-      })
-    } finally {
-      setLoading(false)
-    }
+    // OSS同步数据已经全部加载，不需要分页
+    Taro.showToast({
+      title: '已加载全部数据',
+      icon: 'none'
+    })
+    setHasMore(false)
+    setLoading(false)
   }
 
   const loadFavoritedIds = async () => {

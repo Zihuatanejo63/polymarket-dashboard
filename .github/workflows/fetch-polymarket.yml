@@ -1,0 +1,161 @@
+name: Fetch Polymarket Data
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # 每5分钟执行一次
+  workflow_dispatch:  # 允许手动触发
+
+env:
+  OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+  OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+  OSS_BUCKET: ${{ secrets.OSS_BUCKET }}
+  OSS_REGION: ${{ secrets.OSS_REGION }}
+
+jobs:
+  fetch-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: |
+        npm install axios ali-oss
+        
+    - name: Fetch Polymarket Data
+      run: |
+        node -e "
+        const axios = require('axios');
+        const fs = require('fs');
+        
+        async function fetchData() {
+          try {
+            console.log('Fetching Polymarket data...');
+            
+            // 尝试多个端点
+            const endpoints = [
+              'https://gamma-api.polymarket.com/events?active=true&closed=false&limit=100',
+              'https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100'
+            ];
+            
+            let data = null;
+            
+            for (const endpoint of endpoints) {
+              try {
+                console.log('Trying endpoint:', endpoint);
+                const response = await axios.get(endpoint, {
+                  timeout: 30000,
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                  }
+                });
+                
+                if (response.data) {
+                  data = response.data;
+                  console.log('Success! Got data from:', endpoint);
+                  break;
+                }
+              } catch (error) {
+                console.log('Failed:', endpoint, error.message);
+              }
+            }
+            
+            if (data) {
+              // 标准化数据格式
+              let markets = [];
+              if (Array.isArray(data)) {
+                markets = data;
+              } else if (data.events) {
+                markets = data.events;
+              } else if (data.markets) {
+                markets = data.markets;
+              }
+              
+              // 转换数据格式
+              const transformedMarkets = markets.map(item => {
+                const yesPrice = item.outcomePrices?.[0] || 0.5;
+                return {
+                  id: item.id || item.marketId || String(Math.random()),
+                  question: item.question || item.title || 'Unknown',
+                  description: item.description || '',
+                  outcomes: item.outcomes || ['NO', 'YES'],
+                  outcomePrices: item.outcomePrices || [0.5, 0.5],
+                  probability: Math.round(yesPrice * 100),
+                  volume: parseFloat(item.volume || '0'),
+                  liquidity: parseFloat(item.liquidity || '0'),
+                  active: item.active !== false,
+                  closed: item.closed === true,
+                  tags: Array.isArray(item.tags) ? item.tags : [],
+                  slug: item.slug || '',
+                  createdAt: item.creationTime || new Date().toISOString(),
+                  expiresAt: item.expirationTime || '',
+                  updatedAt: new Date().toISOString()
+                };
+              });
+              
+              // 保存到文件
+              const result = {
+                markets: transformedMarkets,
+                total: transformedMarkets.length,
+                fetchedAt: new Date().toISOString(),
+                source: 'polymarket-gamma-api'
+              };
+              
+              fs.writeFileSync('polymarket-data.json', JSON.stringify(result, null, 2));
+              console.log('Data saved:', transformedMarkets.length, 'markets');
+            } else {
+              console.error('Failed to fetch data from all endpoints');
+              process.exit(1);
+            }
+          } catch (error) {
+            console.error('Error:', error.message);
+            process.exit(1);
+          }
+        }
+        
+        fetchData();
+        "
+        
+    - name: Upload to Aliyun OSS
+      run: |
+        node -e "
+        const OSS = require('ali-oss');
+        const fs = require('fs');
+        
+        async function upload() {
+          try {
+            const client = new OSS({
+              region: process.env.OSS_REGION,
+              accessKeyId: process.env.OSS_ACCESS_KEY_ID,
+              accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET,
+              bucket: process.env.OSS_BUCKET
+            });
+            
+            console.log('Uploading to OSS...');
+            const result = await client.put('polymarket-data.json', 'polymarket-data.json');
+            console.log('Upload success:', result.url);
+            
+            // 设置文件为公共可读
+            await client.putACL('polymarket-data.json', 'public-read');
+            console.log('Set public read access');
+          } catch (error) {
+            console.error('Upload failed:', error.message);
+            process.exit(1);
+          }
+        }
+        
+        upload();
+        "
+        
+    - name: Verify upload
+      run: |
+        echo "Data fetch and upload completed at $(date)"
+        ls -lh polymarket-data.json
+        head -c 500 polymarket-data.json

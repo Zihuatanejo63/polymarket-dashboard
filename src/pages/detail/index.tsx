@@ -37,14 +37,28 @@ const DetailPage = () => {
   const loadEventDetail = async (id: string) => {
     try {
       setLoading(true)
+      // 使用OSS同步端点获取真实市场数据
       const res = await Network.request({
-        url: `/api/market/events/${id}`
+        url: `/api/polymarket-oss/markets/${id}`
       })
 
-      console.log('Event Detail Response:', res.data)
+      console.log('OSS Event Detail Response:', res.data)
 
       if (res.data?.code === 200) {
-        setEvent(res.data.data)
+        const m = res.data.data
+        // 转换数据格式
+        const formattedEvent: MarketEvent = {
+          id: m.id,
+          question: m.question,
+          probability: m.probability,
+          price: m.outcomePrices?.[1] || m.probability / 100,
+          volume24h: m.volume,
+          liquidity: m.liquidity,
+          category: m.tags?.[0] || '其他',
+          change24h: 0,
+          history7Days: []
+        }
+        setEvent(formattedEvent)
       }
     } catch (error) {
       console.error('加载事件详情失败:', error)
