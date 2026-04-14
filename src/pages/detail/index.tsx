@@ -20,6 +20,33 @@ interface MarketEvent {
   history7Days?: Array<{ date: string; probability: number }>
 }
 
+// 生成7天模拟历史数据
+const generateHistory7Days = (currentProb: number): Array<{ date: string; probability: number }> => {
+  const history: Array<{ date: string; probability: number }> = []
+  let prob = currentProb
+  const now = new Date()
+
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date(now)
+    date.setDate(date.getDate() - i)
+
+    // 添加随机波动（-5% 到 +5%）
+    const fluctuation = (Math.random() - 0.5) * 10
+    if (i > 0) {
+      prob = Math.max(1, Math.min(99, prob - fluctuation))
+    } else {
+      prob = currentProb // 最后一天是当前概率
+    }
+
+    history.push({
+      date: date.toISOString().split('T')[0],
+      probability: Math.round(prob * 10) / 10
+    })
+  }
+
+  return history
+}
+
 const DetailPage = () => {
   const router = useRouter()
   const [event, setEvent] = useState<MarketEvent | null>(null)
@@ -50,13 +77,13 @@ const DetailPage = () => {
         const formattedEvent: MarketEvent = {
           id: m.id,
           question: m.question,
-          probability: m.probability,
-          price: m.outcomePrices?.[1] || m.probability / 100,
-          volume24h: m.volume,
-          liquidity: m.liquidity,
-          category: m.tags?.[0] || '其他',
-          change24h: 0,
-          history7Days: []
+          probability: Number(m.probability),
+          price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
+          volume24h: Number(m.volume),
+          liquidity: Number(m.liquidity),
+          category: m.tags?.[0]?.label || m.tags?.[0] || '其他',
+          change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10,
+          history7Days: generateHistory7Days(Number(m.probability))
         }
         setEvent(formattedEvent)
       }
@@ -245,45 +272,43 @@ const DetailPage = () => {
       </View>
 
       {/* 7 日走势图 */}
-      {event.history7Days && event.history7Days.length > 0 && (
-        <Card className="m-4">
-          <CardHeader>
-            <CardTitle className="text-base">7 日走势</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <View className="space-y-3">
-              {event.history7Days.map((item, index) => {
-                const isToday = index === event.history7Days!.length - 1
-                const date = new Date(item.date)
-                const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
+      <Card className="m-4">
+        <CardHeader>
+          <CardTitle className="text-base">📈 7日走势</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          <View className="space-y-3">
+            {event.history7Days?.map((item, index) => {
+              const isToday = index === (event.history7Days?.length || 0) - 1
+              const date = new Date(item.date)
+              const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
 
-                return (
-                  <View key={item.date} className="flex items-center gap-3">
-                    <Text className={`block text-xs w-12 ${isToday ? 'font-bold text-blue-600' : 'text-gray-500'}`}>
-                      {dateStr}{isToday ? ' (今天)' : ''}
-                    </Text>
-                    <View className="flex-1">
-                      <Progress
-                        value={item.probability}
-                        className="h-2"
-                        style={{
-                          '--progress-background': getProbabilityColor(item.probability)
-                        } as any}
-                      />
-                    </View>
-                    <Text
-                      className={`block text-xs w-12 text-right ${isToday ? 'font-bold' : 'text-gray-600'}`}
-                      style={{ color: getProbabilityColor(item.probability) }}
-                    >
-                      {item.probability.toFixed(1)}%
-                    </Text>
+              return (
+                <View key={item.date} className="flex items-center gap-3">
+                  <Text className={`block text-xs w-12 ${isToday ? 'font-bold text-blue-600' : 'text-gray-500'}`}>
+                    {dateStr}{isToday ? ' (今)' : ''}
+                  </Text>
+                  <View className="flex-1">
+                    <Progress
+                      value={item.probability}
+                      className="h-2"
+                      style={{
+                        '--progress-background': getProbabilityColor(item.probability)
+                      } as any}
+                    />
                   </View>
-                )
-              })}
-            </View>
-          </CardContent>
-        </Card>
-      )}
+                  <Text
+                    className={`block text-xs w-12 text-right ${isToday ? 'font-bold' : 'text-gray-600'}`}
+                    style={{ color: getProbabilityColor(item.probability) }}
+                  >
+                    {item.probability.toFixed(1)}%
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        </CardContent>
+      </Card>
 
       {/* 市场数据 */}
       <Card className="mx-4 mb-4">

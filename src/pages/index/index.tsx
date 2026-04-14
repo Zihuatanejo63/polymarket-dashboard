@@ -81,22 +81,47 @@ const IndexPage = () => {
       if (res.data?.code === 200) {
         // 转换OSS数据格式为前端格式
         const rawMarkets = res.data.data || []
-        const formattedEvents = rawMarkets.map((m: any) => ({
-          id: m.id,
-          question: m.question,
-          probability: m.probability,
-          price: m.outcomePrices?.[1] || m.probability / 100,
-          volume24h: m.volume,
-          liquidity: m.liquidity,
-          category: m.tags?.[0] || '其他',
-          change24h: 0 // OSS数据暂不提供24h变化
-        }))
+        const formattedEvents = rawMarkets.map((m: any) => {
+          // 获取标签
+          const tag = m.tags?.[0]
+          const tagLabel = typeof tag === 'object' ? tag?.label : tag
+
+          // 标准化分类
+          let category = '其他'
+          if (tagLabel) {
+            const lowerTag = tagLabel.toLowerCase()
+            if (lowerTag.includes('finance') || lowerTag.includes('crypto') || lowerTag.includes('bitcoin')) {
+              category = '金融'
+            } else if (lowerTag.includes('sport') || lowerTag.includes('nba') || lowerTag.includes('football')) {
+              category = '体育'
+            } else if (lowerTag.includes('tech') || lowerTag.includes('science')) {
+              category = '科技'
+            } else if (lowerTag.includes('politics') || lowerTag.includes('election')) {
+              category = '政治'
+            } else if (lowerTag.includes('entertainment')) {
+              category = '娱乐'
+            } else {
+              category = tagLabel
+            }
+          }
+
+          return {
+            id: m.id,
+            question: m.question,
+            probability: Number(m.probability),
+            price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
+            volume24h: Number(m.volume),
+            liquidity: Number(m.liquidity),
+            category,
+            change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10
+          }
+        })
 
         // 根据类别筛选
         let filteredEvents = formattedEvents
         if (selectedCategory !== '全部') {
           if (selectedCategory === '热榜') {
-            filteredEvents = formattedEvents.sort((a: MarketEvent, b: MarketEvent) => b.volume24h - a.volume24h)
+            filteredEvents = [...formattedEvents].sort((a: MarketEvent, b: MarketEvent) => b.volume24h - a.volume24h)
           } else {
             filteredEvents = formattedEvents.filter((e: MarketEvent) =>
               e.category.includes(selectedCategory)

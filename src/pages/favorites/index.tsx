@@ -49,8 +49,22 @@ const FavoritesPage = () => {
       console.log('Favorites res.data:', res.data)
 
       if (res.data?.code === 200) {
-        const data = res.data.data || []
-        console.log('解析后的收藏数据:', data)
+        const rawData = res.data.data || []
+        console.log('原始收藏数据:', rawData)
+
+        // 转换OSS数据格式为前端格式
+        const data = rawData.map((m: any) => ({
+          id: m.id,
+          question: m.question,
+          probability: Number(m.probability),
+          price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
+          volume24h: Number(m.volume),
+          liquidity: Number(m.liquidity),
+          category: m.tags?.[0]?.label || m.tags?.[0] || '其他',
+          change24h: 0
+        }))
+
+        console.log('转换后的收藏数据:', data)
         console.log('Favorites count:', data.length)
         setFavorites(data)
 

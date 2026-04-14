@@ -1,18 +1,17 @@
 import { Injectable } from '@nestjs/common'
-import { MarketService } from '../market/market.service'
-import { MarketEvent } from '../market/market.service'
+import { OssSyncService } from '../oss-sync/oss-sync.service'
 
 // 内存存储（生产环境应该使用数据库）
 const favoritesStore = new Map<string, Set<string>>()
 
 @Injectable()
 export class FavoritesService {
-  constructor(private readonly marketService: MarketService) {}
+  constructor(private readonly ossSyncService: OssSyncService) {}
 
   /**
    * 获取用户的收藏列表
    */
-  async getUserFavorites(userId: string): Promise<MarketEvent[]> {
+  async getUserFavorites(userId: string): Promise<any[]> {
     const userFavorites = favoritesStore.get(userId) || new Set()
     const eventIds = Array.from(userFavorites)
 
@@ -20,12 +19,11 @@ export class FavoritesService {
       return []
     }
 
-    // 获取所有事件
-    const events = await this.marketService.getMarkets()
-    const { safeEvents } = this.marketService.filterMarkets(events)
+    // 从OSS获取所有市场数据
+    const events = this.ossSyncService.getMarkets()
 
     // 筛选出已收藏的事件
-    return safeEvents.filter(event => eventIds.includes(event.id))
+    return events.filter((event: any) => eventIds.includes(event.id))
   }
 
   /**
@@ -39,11 +37,9 @@ export class FavoritesService {
     const userFavorites = favoritesStore.get(userId)!
     userFavorites.add(eventId)
 
-    // 返回收藏的事件信息
-    const events = await this.marketService.getMarkets()
-    const { safeEvents } = this.marketService.filterMarkets(events)
-
-    const event = safeEvents.find(e => e.id === eventId)
+    // 从OSS获取事件信息
+    const events = this.ossSyncService.getMarkets()
+    const event = events.find((e: any) => e.id === eventId)
 
     return {
       userId,

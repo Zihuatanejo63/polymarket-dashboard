@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common'
 import { FavoritesService } from './favorites.service'
 import { FavoritesController } from './favorites.controller'
-import { MarketModule } from '../market/market.module'
+import { OssSyncModule } from '../oss-sync/oss-sync.module'
 
 @Module({
-  imports: [MarketModule],
+  imports: [OssSyncModule],
   controllers: [FavoritesController],
   providers: [FavoritesService],
   exports: [FavoritesService],
