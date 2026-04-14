@@ -5,7 +5,8 @@ import { lastValueFrom } from 'rxjs'
 import { PolymarketService } from '../polymarket/polymarket.service'
 import { PolymarketGoldskyService } from '../polymarket-goldsky/polymarket-goldsky.service'
 import { PolymarketDuneService } from '../polymarket-dune/polymarket-dune.service'
-import { PolymarketProxyService } from '../polymarket-proxy/polymarket-proxy.service'  
+import { PolymarketProxyService } from '../polymarket-proxy/polymarket-proxy.service'
+import { PolymarketRealtimeService } from '../polymarket-realtime/polymarket-realtime.service'    
 
 export interface MarketEvent {
   id: string
@@ -36,11 +37,12 @@ export class MarketService {
     private goldskyService: PolymarketGoldskyService,
     private duneService: PolymarketDuneService,
     private proxyService: PolymarketProxyService,
+    private realtimeService: PolymarketRealtimeService,
   ) {}
 
   /**
    * 获取 Poly Market 数据
-   * 优先顺序：Proxy (无限制) -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
+   * 优先顺序：Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -50,7 +52,28 @@ export class MarketService {
     }
 
     try {
-      // 优先尝试从 Proxy Service 获取数据（无限制查询）
+      // 优先尝试从 Realtime Service 获取数据（实时 + 无限制查询）
+      console.log('[MarketService] 尝试从 Realtime Service 获取数据（实时 + 无限制查询）...')
+      const realtimeMarkets = this.realtimeService.getAllMarkets()
+      console.log(`[MarketService] 从 Realtime Service 获取了 ${realtimeMarkets.length} 个事件`)
+
+      if (realtimeMarkets.length > 0) {
+        // 转换数据格式
+        const transformedEvents = this.transformRealtimeToMarket(realtimeMarkets)
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+        console.log(`[MarketService] 成功使用 Realtime Service 真实数据，共 ${transformedEvents.length} 个事件`)
+        return transformedEvents
+      }
+    } catch (error) {
+      console.error('[MarketService] 从 Realtime Service 获取数据失败:', error.message)
+    }
+
+    try {
+      // Realtime 失败，尝试从 Proxy Service 获取数据（无限制查询）
       console.log('[MarketService] 尝试从 Proxy Service 获取数据（无限制查询）...')
       const proxyMarkets = await this.proxyService.getAllMarkets()
       console.log(`[MarketService] 从 Proxy Service 获取了 ${proxyMarkets.length} 个事件`)
@@ -68,27 +91,6 @@ export class MarketService {
       }
     } catch (error) {
       console.error('[MarketService] 从 Proxy Service 获取数据失败:', error.message)
-    }
-
-    try {
-      // Proxy 失败，尝试从 Dune Analytics 获取真实数据
-      console.log('[MarketService] 尝试从 Dune Analytics 获取真实数据...')
-      const duneEvents = await this.duneService.getActiveMarkets()
-      console.log(`[MarketService] 从 Dune Analytics 获取了 ${duneEvents.length} 个事件`)
-
-      if (duneEvents.length > 0) {
-        // 转换数据格式
-        const transformedEvents = this.transformDuneToMarket(duneEvents)
-
-        // 更新缓存
-        this.cachedEvents = transformedEvents
-        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
-
-        console.log(`[MarketService] 成功使用 Dune Analytics 真实数据，共 ${transformedEvents.length} 个事件`)
-        return transformedEvents
-      }
-    } catch (error) {
-      console.error('[MarketService] 从 Dune Analytics 获取数据失败:', error.message)
     }
 
     try {
@@ -142,6 +144,41 @@ export class MarketService {
 
       return mockData
     }
+  }
+
+  /**
+   * 转换 Realtime 数据为标准格式
+   */
+  private transformRealtimeToMarket(realtimeMarkets: any[]): MarketEvent[] {
+    return realtimeMarkets.map(market => {
+      // 从 Realtime 数据中提取信息
+      const question = market.question || '未命名事件'
+
+      // 使用Realtime服务已经分类好的类别
+      const category = market.category || this.categorizeEvent(question)
+
+      // 概率已经在 realtimeMarkets 中计算好了
+      const probability = market.probability || 50
+
+      // 从价格历史计算24小时变化（如果有的话）
+      let change24h = 0
+      if (market.priceHistory && market.priceHistory.length >= 2) {
+        const current = market.priceHistory[market.priceHistory.length - 1].price
+        const previous = market.priceHistory[0].price
+        change24h = (current - previous) / previous * 100
+      }
+
+      return {
+        id: market.id || `realtime_${Math.random().toString(36).substr(2, 9)}`,
+        question,
+        probability,
+        price: probability / 100,
+        volume24h: market.volume || 0,
+        liquidity: market.liquidity || 0,
+        category,
+        change24h
+      }
+    })
   }
 
   /**

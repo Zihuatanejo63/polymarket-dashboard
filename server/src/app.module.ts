@@ -11,9 +11,10 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { PolymarketGoldskyModule } from './polymarket-goldsky/polymarket-goldsky.module';
 import { PolymarketDuneModule } from './polymarket-dune/polymarket-dune.module';
 import { PolymarketProxyModule } from './polymarket-proxy/polymarket-proxy.module';
+import { PolymarketRealtimeModule } from './polymarket-realtime/polymarket-realtime.module';
 
 @Module({
-  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule, PolymarketModule, AuthModule, ScheduleModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule],
+  imports: [MarketModule, FavoritesModule, NotificationModule, AnalysisModule, PolymarketModule, AuthModule, ScheduleModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -7,9 +7,10 @@ import { PolymarketModule } from '../polymarket/polymarket.module'
 import { PolymarketGoldskyModule } from '../polymarket-goldsky/polymarket-goldsky.module'
 import { PolymarketDuneModule } from '../polymarket-dune/polymarket-dune.module'
 import { PolymarketProxyModule } from '../polymarket-proxy/polymarket-proxy.module'
+import { PolymarketRealtimeModule } from '../polymarket-realtime/polymarket-realtime.module'
 
 @Module({
-  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule],
+  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule],
   controllers: [MarketController],
   providers: [MarketService],
   exports: [MarketService],
