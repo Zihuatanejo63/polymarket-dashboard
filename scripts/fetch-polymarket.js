@@ -10,9 +10,9 @@ const COS_CONFIG = {
   region: process.env.COS_REGION
 };
 
-// 豆包API配置 - 使用火山引擎直接API
-const DOUBAO_API_KEY = process.env.COZE_API_KEY; // 使用COZE_API_KEY作为豆包API Key
-const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+// Coze API配置（使用已配置的COZE_API_KEY）
+const COZE_API_KEY = process.env.COZE_API_KEY;
+const COZE_API_URL = 'https://api.coze.cn/open_api/v2/chat';
 
 /**
  * 调用豆包API批量翻译
@@ -20,7 +20,7 @@ const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completion
  * @returns {Promise<string[]>} 中文翻译数组
  */
 async function translateWithDoubao(texts) {
-  if (!DOUBAO_API_KEY) {
+  if (!COZE_API_KEY) {
     console.warn('⚠️ 未配置COZE_API_KEY，使用简单翻译');
     return texts.map(simpleTranslate);
   }
@@ -52,22 +52,22 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      model: 'doubao-pro-32k-241115', // 使用豆包Pro模型
-      messages: [
-        { role: 'system', content: '你是一个专业的翻译助手，擅长将英文翻译成自然流畅的中文。' },
-        { role: 'user', content: prompt }
+      bot_id: '7398091034558922764', // 使用Coze Bot ID
+      user_id: 'github-actions',
+      additional_messages: [
+        { role: 'user', content: prompt, content_type: 'text' }
       ],
-      temperature: 0.3,
-      max_tokens: 4096
+      stream: false
     });
 
-    console.log('  发送请求到豆包API...');
+    console.log('  发送请求到Coze API...');
 
-    const req = https.request(DOUBAO_API_URL, {
+    const req = https.request(COZE_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DOUBAO_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${COZE_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': '*/*'
       },
       timeout: 60000
     }, (res) => {
@@ -77,23 +77,16 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
         try {
           console.log('  API响应状态:', res.statusCode);
           
-          if (res.statusCode !== 200) {
-            console.error('❌ 豆包API返回错误状态:', res.statusCode);
-            console.error('  响应:', data.substring(0, 200));
-            resolve(texts.map(simpleTranslate));
-            return;
-          }
-          
           const result = JSON.parse(data);
           
-          if (result.error) {
-            console.error('❌ 豆包API错误:', result.error.message || result.error);
+          if (result.code !== 0) {
+            console.error('❌ Coze API错误:', result.msg);
             resolve(texts.map(simpleTranslate));
             return;
           }
 
-          // 解析翻译结果 - 豆包API返回格式
-          const content = result.choices?.[0]?.message?.content || '';
+          // 解析翻译结果 - Coze API返回格式
+          const content = result.data?.messages?.[0]?.content || '';
           console.log('  收到翻译内容长度:', content.length);
           
           const translations = content.split('\n').filter(line => line.trim());
@@ -101,7 +94,7 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
           // 确保返回数量与输入一致
           if (translations.length >= texts.length) {
-            console.log('✅ 豆包API翻译成功');
+            console.log('✅ Coze API翻译成功');
             resolve(translations.slice(0, texts.length));
           } else {
             console.warn('⚠️ 翻译结果数量不匹配，使用混合策略');
@@ -112,7 +105,7 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
             resolve(result);
           }
         } catch (e) {
-          console.error('❌ 解析豆包API响应失败:', e.message);
+          console.error('❌ 解析Coze API响应失败:', e.message);
           console.error('  原始响应:', data.substring(0, 200));
           resolve(texts.map(simpleTranslate));
         }
@@ -120,12 +113,12 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
     });
 
     req.on('error', (err) => {
-      console.error('❌ 豆包API请求失败:', err.message);
+      console.error('❌ Coze API请求失败:', err.message);
       resolve(texts.map(simpleTranslate));
     });
 
     req.on('timeout', () => {
-      console.error('❌ 豆包API超时');
+      console.error('❌ Coze API超时');
       req.destroy();
       resolve(texts.map(simpleTranslate));
     });
