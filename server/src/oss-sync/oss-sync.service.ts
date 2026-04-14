@@ -69,9 +69,9 @@ export class OssSyncService {
 
     return {
       ...market,
-      // 添加中文翻译
-      questionZh: translateToChinese(market.question || ''),
-      categoryZh,
+      // 优先使用COS中的中文翻译，如果没有则本地翻译
+      questionZh: market.questionZh || translateToChinese(market.question || ''),
+      categoryZh: market.categoryZh || categoryZh,
       // 添加格式化字段
       probabilityZh: formatProbability(probabilityNum),
       probabilityRaw: probabilityNum,
