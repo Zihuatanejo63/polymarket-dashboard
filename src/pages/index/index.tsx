@@ -5,15 +5,8 @@ import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Star, ArrowUpRight, ChevronDown, Search, SlidersHorizontal, Bookmark, Check } from 'lucide-react-taro'  
+import { Star, ArrowUpRight, ChevronDown, Search, SlidersHorizontal, Bookmark } from 'lucide-react-taro'  
 import './index.config'  
-
-// 隐藏选项  
-const hideOptions = [  
-  { id: 'hide-sports', label: '隐藏体育类' },  
-  { id: 'hide-crypto', label: '隐藏加密货币类' },  
-  { id: 'hide-finance', label: '隐藏财报类' },  
-]  
 
 // 分类配置  
 const categories = ['全部', '热榜', '金融', '体育', '科技', '其他']  
@@ -60,34 +53,6 @@ const PillTag = ({
 }  
 
 
-// 辅助组件：复选框  
-const FilterCheckbox = ({  
-  label,  
-  checked,  
-  onChange  
-}: {  
-  label: string  
-  checked: boolean  
-  onChange: (checked: boolean) => void  
-}) => {  
-  return (  
-    <View  
-      onClick={() => onChange(!checked)}  
-      className="flex items-center gap-2 cursor-pointer"  
-    >  
-      <View  
-        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${  
-          checked  
-            ? 'bg-blue-600 border-blue-600'  
-            : 'border-gray-300 bg-white'  
-        }`}  
-      >  
-        {checked && <Check size={10} color="#ffffff" />}  
-      </View>  
-      <Text className="block text-sm text-gray-600">{label}</Text>  
-    </View>  
-  )  
-}
 
 interface MarketEvent {
   id: string
@@ -117,8 +82,7 @@ const IndexPage = () => {
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
   
-  // 新增状态：隐藏选项、下拉菜单
-  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set())
+  // 新增状态：下拉菜单
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [selectedVolumeRange, setSelectedVolumeRange] = useState('24h')
   const [selectedStatus, setSelectedStatus] = useState('active')
@@ -477,26 +441,6 @@ const IndexPage = () => {
                 </View>
               )}
             </View>
-          </View>
-
-          {/* 复选框区域 */}
-          <View className="flex items-center gap-4 ml-auto">
-            {hideOptions.map((opt) => (
-              <FilterCheckbox
-                key={opt.id}
-                label={opt.label}
-                checked={hiddenCategories.has(opt.id)}
-                onChange={(checked) => {
-                  const newSet = new Set(hiddenCategories)
-                  if (checked) {
-                    newSet.add(opt.id)
-                  } else {
-                    newSet.delete(opt.id)
-                  }
-                  setHiddenCategories(newSet)
-                }}
-              />
-            ))}
           </View>
         </View>
       </View>
