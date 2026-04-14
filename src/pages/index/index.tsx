@@ -85,11 +85,14 @@ const IndexPage = () => {
           // 使用后端已翻译的中文分类
           const category = m.categoryZh || '其他'
 
+          // 从后端返回的格式化概率获取（已转换好）
+          const probability = Math.round(parseFloat(m.probabilityRaw) * 10) / 10 || 50
+
           return {
             id: m.id,
             question: m.questionZh || m.question,
-            probability: Number(m.probability) || 50,
-            price: parseFloat(m.outcomePrices?.[1]) || 0.5,
+            probability,
+            price: probability / 100,
             volume24h: Number(m.volume),
             liquidity: Number(m.liquidity),
             category,
