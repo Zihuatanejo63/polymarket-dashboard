@@ -244,7 +244,23 @@ function enhancedTranslate(text) {
     translated = translated.replace(regex, to);
   }
   
-  // 第2步：使用TRANSLATIONS字典替换单个词
+  // 第2步：处理剩余动词
+  const verbReplacements = [
+    ['return', '回归'],
+    ['released', '发布'],
+    ['announced', '宣布'],
+    ['become', '成为'],
+    ['sign', '签署'],
+    ['reach', '达到'],
+    ['hit', '达到'],
+  ];
+  
+  for (const [from, to] of verbReplacements) {
+    const regex = new RegExp(`\\b${from}\\b`, 'gi');
+    translated = translated.replace(regex, to);
+  }
+  
+  // 第3步：使用TRANSLATIONS字典替换单个词
   const sorted = Object.keys(TRANSLATIONS).sort((a, b) => b.length - a.length);
   for (const key of sorted) {
     const regex = new RegExp(`\\b${key}\\b`, 'gi');
