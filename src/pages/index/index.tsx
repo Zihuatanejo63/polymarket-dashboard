@@ -87,14 +87,14 @@ const IndexPage = () => {
 
           return {
             id: m.id,
-            question: m.question,
-            probability: Number(m.probabilityRaw || m.probability),
-            price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
+            question: m.questionZh || m.question,
+            probability: Number(m.probability) || 50,
+            price: parseFloat(m.outcomePrices?.[1]) || 0.5,
             volume24h: Number(m.volume),
             liquidity: Number(m.liquidity),
             category,
             categoryRaw: m.tags?.[0]?.label || m.tags?.[0] || '',
-            change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10
+            change24h: 0 // COS数据不提供24h变化
           }
         })
 
