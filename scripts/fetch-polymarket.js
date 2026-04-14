@@ -50,7 +50,15 @@ function transformData(rawData, source = 'gamma') {
   
   return markets.map(item => {
     // PolyMarket: YES价格=outcomePrices[0], NO价格=outcomePrices[1]
-    const outcomePrices = item.outcomePrices || ['0.5', '0.5'];
+    // outcomePrices可能是JSON字符串，需要解析
+    let outcomePrices = item.outcomePrices || ['0.5', '0.5'];
+    if (typeof outcomePrices === 'string') {
+      try {
+        outcomePrices = JSON.parse(outcomePrices);
+      } catch (e) {
+        outcomePrices = ['0.5', '0.5'];
+      }
+    }
     const yesPrice = parseFloat(outcomePrices[0]) || 0.5;
     const probability = Math.round(yesPrice * 100);
     
