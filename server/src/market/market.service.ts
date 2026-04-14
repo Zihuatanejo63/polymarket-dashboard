@@ -3,6 +3,8 @@ import { HttpService } from '@nestjs/axios'
 import { ConfigService } from '@nestjs/config'
 import { lastValueFrom } from 'rxjs'
 import { PolymarketService } from '../polymarket/polymarket.service'
+import { PolymarketGoldskyService } from '../polymarket-goldsky/polymarket-goldsky.service'
+import { PolymarketDuneService } from '../polymarket-dune/polymarket-dune.service'
 
 export interface MarketEvent {
   id: string
@@ -30,11 +32,13 @@ export class MarketService {
     private httpService: HttpService,
     private configService: ConfigService,
     private polymarketService: PolymarketService,
+    private goldskyService: PolymarketGoldskyService,
+    private duneService: PolymarketDuneService,
   ) {}
 
   /**
    * 获取 Poly Market 数据
-   * 优先使用真实API，失败时使用缓存的模拟数据
+   * 优先顺序：Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -44,23 +48,55 @@ export class MarketService {
     }
 
     try {
-      // 尝试从 Poly Market 获取真实数据
+      // 优先尝试从 Dune Analytics 获取真实数据
+      console.log('[MarketService] 尝试从 Dune Analytics 获取真实数据...')
+      const duneEvents = await this.duneService.getActiveMarkets()
+      console.log(`[MarketService] 从 Dune Analytics 获取了 ${duneEvents.length} 个事件`)
+
+      if (duneEvents.length > 0) {
+        // 转换数据格式
+        const transformedEvents = this.transformDuneToMarket(duneEvents)
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+        console.log(`[MarketService] 成功使用 Dune Analytics 真实数据，共 ${transformedEvents.length} 个事件`)
+        return transformedEvents
+      }
+    } catch (error) {
+      console.error('[MarketService] 从 Dune Analytics 获取数据失败:', error.message)
+    }
+
+    try {
+      // Dune 失败，尝试从 Goldsky 获取真实数据
+      console.log('[MarketService] 尝试从 Goldsky 获取真实数据...')
+      const goldskyEvents = await this.goldskyService.getActiveMarkets()
+      console.log(`[MarketService] 从 Goldsky 获取了 ${goldskyEvents.length} 个事件`)
+
+      if (goldskyEvents.length > 0) {
+        // 转换数据格式
+        const transformedEvents = this.transformGoldskyToMarket(goldskyEvents)
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+        console.log(`[MarketService] 成功使用 Goldsky 真实数据，共 ${transformedEvents.length} 个事件`)
+        return transformedEvents
+      }
+    } catch (error) {
+      console.error('[MarketService] 从 Goldsky 获取数据失败:', error.message)
+    }
+
+    try {
+      // Goldsky 失败，尝试从 Poly Market 官方 API 获取真实数据
+      console.log('[MarketService] 尝试从 Poly Market 官方 API 获取数据...')
       const polymarketData = await this.polymarketService.fetchPolymarketData()
       console.log(`从 Poly Market 获取了 ${polymarketData.length} 个真实事件`)
 
       // 转换数据格式
       const transformedEvents = this.transformPolymarketToMarket(polymarketData)
-
-      // 如果获取的数据少于50个，补充到50个
-      if (transformedEvents.length < 50) {
-        console.log(`数据量不足50个，补充模拟数据...`)
-        const mockData = this.getMockData()
-        // 合并数据，去重
-        const existingIds = new Set(transformedEvents.map(e => e.id))
-        const additionalEvents = mockData.filter(e => !existingIds.has(e.id)).slice(0, 50 - transformedEvents.length)
-        transformedEvents.push(...additionalEvents)
-        console.log(`补充后总共 ${transformedEvents.length} 个事件`)
-      }
 
       // 更新缓存
       this.cachedEvents = transformedEvents
@@ -68,8 +104,8 @@ export class MarketService {
 
       return transformedEvents
     } catch (error) {
-      console.error('获取 Poly Market 真实数据失败:', error.message)
-      console.log('使用缓存的模拟数据作为降级方案')
+      console.error('[MarketService] 获取 Poly Market 真实数据失败:', error.message)
+      console.log('[MarketService] 使用模拟数据作为降级方案')
 
       // 返回缓存的模拟数据（如果存在）
       if (this.cachedEvents) {
@@ -83,6 +119,68 @@ export class MarketService {
 
       return mockData
     }
+  }
+
+  /**
+   * 转换 Dune 数据为标准格式
+   */
+  private transformDuneToMarket(duneEvents: any[]): MarketEvent[] {
+    return duneEvents.map(event => {
+      // 从 Dune 数据中提取信息
+      const question = event.question || '未命名事件'
+      const yesPrice = event.outcomePrices?.[0] || 0.5
+
+      // 根据 question 内容自动分类
+      const category = this.categorizeEvent(question)
+
+      // 概率已经在 duneEvents 中计算过了
+      const probability = event.probability || Math.round(yesPrice * 100)
+
+      // 计算24小时变化（这里默认为0，因为Dune可能不提供这个数据）
+      const change24h = 0
+
+      return {
+        id: event.id || `dune_${Math.random().toString(36).substr(2, 9)}`,
+        question,
+        probability,
+        price: yesPrice,
+        volume24h: event.volume || 0,
+        liquidity: event.liquidity || 0,
+        category,
+        change24h
+      }
+    })
+  }
+
+  /**
+   * 转换 Goldsky 数据为标准格式
+   */
+  private transformGoldskyToMarket(goldskyEvents: any[]): MarketEvent[] {
+    return goldskyEvents.map(event => {
+      // 从 Goldsky 数据中提取信息
+      const question = event.question || '未命名事件'
+      const yesPrice = event.outcomePrices?.[0] || 0.5
+
+      // 根据 question 内容自动分类
+      const category = this.categorizeEvent(question)
+
+      // 概率已经在 goldskyEvents 中计算过了
+      const probability = event.probability || Math.round(yesPrice * 100)
+
+      // 计算24小时变化（这里默认为0，因为Goldsky可能不提供这个数据）
+      const change24h = 0
+
+      return {
+        id: event.id || `goldsky_${Math.random().toString(36).substr(2, 9)}`,
+        question,
+        probability,
+        price: yesPrice,
+        volume24h: event.volume || 0,
+        liquidity: event.liquidity || 0,
+        category,
+        change24h
+      }
+    })
   }
 
   /**
