@@ -27,6 +27,10 @@ jobs:
         if [ -z "$COS_BUCKET" ]; then echo "❌ COS_BUCKET is not set"; exit 1; else echo "✅ COS_BUCKET: $COS_BUCKET"; fi
         if [ -z "$COS_REGION" ]; then echo "❌ COS_REGION is not set"; exit 1; else echo "✅ COS_REGION: $COS_REGION"; fi
 
+    - name: Install dependencies
+      run: |
+        cd scripts && npm install
+
     - name: Run Fetch Script
       run: |
         node scripts/fetch-polymarket.js

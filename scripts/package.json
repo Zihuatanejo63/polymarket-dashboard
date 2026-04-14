@@ -1,0 +1,8 @@
+{
+  "name": "polymarket-fetcher",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "cos-nodejs-sdk-v5": "^2.13.0"
+  }
+}

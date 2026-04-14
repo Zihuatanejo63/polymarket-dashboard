@@ -2,13 +2,13 @@
 
 /**
  * PolyMarket Data Fetcher
- * 独立的Node.js脚本，用于GitHub Actions
- * 不依赖项目根目录的package.json
+ * 用于GitHub Actions的独立脚本
  */
 
-const https = require('https');
-const http = require('http');
-const fs = require('fs');
+import COS from 'cos-nodejs-sdk-v5';
+import https from 'https';
+import http from 'http';
+import fs from 'fs';
 
 // COS配置（通过环境变量传入）
 const COS_CONFIG = {
@@ -109,54 +109,43 @@ function transformData(rawData) {
 }
 
 /**
- * 上传到腾讯云COS（使用XML API）
+ * 上传到腾讯云COS
  */
 async function uploadToCOS(data) {
   const { secretId, secretKey, bucket, region } = COS_CONFIG;
   
-  console.log('Uploading to COS...');
-  
-  // 构造COS XML API请求
-  const host = `${bucket}.cos.${region}.myqcloud.com`;
-  const path = '/polymarket-data.json';
-  const body = JSON.stringify(data);
-  
-  // 简单的签名方式（适用于临时密钥或低安全要求场景）
-  // 生产环境建议使用完整的STS签名
-  const auth = Buffer.from(`${secretId}:${secretKey}`).toString('base64');
+  console.log('Initializing COS client...');
   
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: host,
-      port: 443,
-      path: path,
-      method: 'PUT',
-      headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    };
-    
-    const req = https.request(options, (res) => {
-      console.log(`COS Response Status: ${res.statusCode}`);
-      
-      let responseData = '';
-      res.on('data', chunk => responseData += chunk);
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          console.log('✅ Upload successful!');
-          resolve(responseData);
-        } else {
-          console.error('❌ Upload failed:', responseData);
-          reject(new Error(`COS upload failed with status ${res.statusCode}: ${responseData}`));
-        }
-      });
+    const cos = new COS({
+      SecretId: secretId,
+      SecretKey: secretKey
     });
     
-    req.on('error', reject);
-    req.write(body);
-    req.end();
+    const body = JSON.stringify(data);
+    
+    console.log('Uploading to COS...');
+    console.log('Bucket:', bucket);
+    console.log('Region:', region);
+    
+    cos.putObject({
+      Bucket: bucket,
+      Region: region,
+      Key: 'polymarket-data.json',
+      Body: Buffer.from(body),
+      ContentType: 'application/json',
+      ACL: 'public-read'
+    }, (err, data) => {
+      if (err) {
+        console.error('❌ COS Error:', err);
+        reject(err);
+      } else {
+        console.log('✅ Upload successful!');
+        console.log('ETag:', data.ETag);
+        console.log('Location:', data.Location);
+        resolve(data);
+      }
+    });
   });
 }
 
@@ -204,6 +193,7 @@ async function main() {
     await uploadToCOS(result);
     
     console.log('\n=== ✅ All steps completed successfully! ===');
+    console.log(`\n📊 Data URL: https://${COS_CONFIG.bucket}.cos.${COS_CONFIG.region}.myqcloud.com/polymarket-data.json`);
     
   } catch (error) {
     console.error('\n❌ Error:', error.message);
