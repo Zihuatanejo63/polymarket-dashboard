@@ -515,35 +515,66 @@ async function main() {
     console.log('\n--- 开始豆包API翻译 ---');
     const translatedMarkets = await batchTranslateMarkets(selectedMarkets);
 
-    // 4. 更新历史数据（用于图表）
+    // 4. 更新历史数据（用于图表）- 改为按市场存储历史序列
     console.log('\n--- 更新历史数据 ---');
-    let historyData = [];
+    let marketHistoryMap = {};
     try {
       const historyUrl = `https://${COS_CONFIG.bucket}.cos.${COS_CONFIG.region}.myqcloud.com/polymarket-history.json`;
       const historyRes = await fetchUrl(historyUrl);
-      if (Array.isArray(historyRes)) {
-        historyData = historyRes;
-        // 只保留最近30天数据
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        historyData = historyData.filter(h => new Date(h.timestamp) > thirtyDaysAgo);
+      if (historyRes && typeof historyRes === 'object' && !Array.isArray(historyRes)) {
+        marketHistoryMap = historyRes;
       }
     } catch (e) {
       console.log('  历史数据不存在或获取失败，创建新历史');
     }
     
-    // 添加当前时间点数据（Top 100市场的概率历史）
-    const currentSnapshot = {
-      timestamp: new Date().toISOString(),
-      markets: translatedMarkets.slice(0, 100).map(m => ({
-        id: m.id,
-        question: m.question,
-        questionZh: m.questionZh,
+    // 为每个市场添加当前概率数据点（只保留Top 200市场，避免数据过大）
+    const now = new Date().toISOString();
+    const topMarkets = translatedMarkets.slice(0, 200);
+    
+    topMarkets.forEach(m => {
+      if (!marketHistoryMap[m.id]) {
+        marketHistoryMap[m.id] = {
+          id: m.id,
+          question: m.question,
+          questionZh: m.questionZh,
+          history: []
+        };
+      }
+      
+      // 添加当前数据点
+      marketHistoryMap[m.id].history.push({
+        timestamp: now,
         probability: m.probability,
         volume: m.volume
-      }))
-    };
-    historyData.push(currentSnapshot);
+      });
+      
+      // 只保留最近30天的数据点（假设每小时抓取一次，30天=720个点）
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      marketHistoryMap[m.id].history = marketHistoryMap[m.id].history.filter(
+        h => new Date(h.timestamp) > thirtyDaysAgo
+      );
+      
+      // 更新市场信息
+      marketHistoryMap[m.id].question = m.question;
+      marketHistoryMap[m.id].questionZh = m.questionZh;
+    });
+    
+    // 清理已不存在的市场数据（如果超过7天没有更新）
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    Object.keys(marketHistoryMap).forEach(key => {
+      const lastUpdate = marketHistoryMap[key].history[marketHistoryMap[key].history.length - 1];
+      if (lastUpdate && new Date(lastUpdate.timestamp) < sevenDaysAgo) {
+        delete marketHistoryMap[key];
+      }
+    });
+    
+    // 统计历史数据
+    const totalHistoryPoints = Object.values(marketHistoryMap).reduce(
+      (sum, m) => sum + (m.history?.length || 0), 0
+    );
     
     // 5. 上传数据和历史
     const result = {
@@ -555,8 +586,8 @@ async function main() {
 
     console.log('\n--- 上传到COS ---');
     await uploadToCOS(result);
-    await uploadHistoryToCOS(historyData);
-    console.log(`  已更新历史数据: ${historyData.length} 个时间点`);
+    await uploadHistoryToCOS(marketHistoryMap);
+    console.log(`  已更新历史数据: ${Object.keys(marketHistoryMap).length} 个市场, ${totalHistoryPoints} 个数据点`);
 
     console.log('\n=== 完成 ===');
     console.log(`总计: ${translatedMarkets.length} 条已翻译市场数据`);

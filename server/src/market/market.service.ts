@@ -1047,8 +1047,30 @@ export class MarketService {
       throw new Error('事件不存在')
     }
 
-    // 生成模拟的 7 天历史数据
-    const history7Days = this.generateMockHistory(event.probability, event.change24h)
+    // 尝试从COS获取真实历史数据
+    let history7Days: Array<{ date: string; probability: number }> = []
+    try {
+      const historyUrl = 'https://polymarket-san123-1422055715.cos.ap-hongkong.myqcloud.com/polymarket-history.json'
+      const response = await lastValueFrom(this.httpService.get(historyUrl))
+      const marketHistoryMap = response.data
+      
+      if (marketHistoryMap && marketHistoryMap[id] && marketHistoryMap[id].history) {
+        // 转换历史数据格式
+        history7Days = marketHistoryMap[id].history.map((h: any) => ({
+          date: h.timestamp,
+          probability: h.probability
+        })).sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        
+        console.log(`[MarketService] 获取到市场 ${id} 的真实历史数据: ${history7Days.length} 个点`)
+      }
+    } catch (error) {
+      console.log(`[MarketService] 获取历史数据失败，使用模拟数据:`, error.message)
+    }
+    
+    // 如果没有真实历史数据，生成模拟数据
+    if (history7Days.length === 0) {
+      history7Days = this.generateMockHistory(event.probability, event.change24h)
+    }
 
     return {
       ...event,
