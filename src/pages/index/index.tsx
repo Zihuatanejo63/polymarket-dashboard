@@ -5,8 +5,96 @@ import { Network } from '@/network'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Star, RefreshCw } from 'lucide-react-taro'
-import './index.config'
+import { Star, ChevronsRight, ArrowUpRight, ChevronDown, Search, SlidersHorizontal, Bookmark, Check } from 'lucide-react-taro'  
+import './index.config'  
+
+// 话题标签数据  
+const topicTags = [  
+  '全部', '特朗普', '伊朗', '油价', '秘鲁选举', '每日温度',   
+  'Tweet Markets', '伊朗停火', '霍尔木兹海峡', '政府关闭',   
+  '印度超级联赛', '全球选举', '国会', '中期', 'AI', 'IPO', '美联储'  
+]  
+
+// 隐藏选项  
+const hideOptions = [  
+  { id: 'hide-sports', label: '隐藏体育类' },  
+  { id: 'hide-crypto', label: '隐藏加密货币类' },  
+  { id: 'hide-finance', label: '隐藏财报类' },  
+]  
+
+// 分类配置  
+const categories = ['全部', '热榜', '金融', '体育', '科技', '其他']  
+
+
+// 辅助组件：胶囊标签  
+const PillTag = ({  
+  label,  
+  isActive,  
+  onClick,  
+  variant = 'default'  
+}: {  
+  label: string  
+  isActive?: boolean  
+  onClick?: () => void  
+  variant?: 'default' | 'blue'  
+}) => {  
+  if (variant === 'blue') {  
+    return (  
+      <View  
+        onClick={onClick}  
+        className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${  
+          isActive  
+            ? 'bg-blue-600 text-white'  
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'  
+        }`}  
+      >  
+        <Text className="block">{label}</Text>  
+      </View>  
+    )  
+  }  
+  return (  
+    <View  
+      onClick={onClick}  
+      className={`px-3 py-2 rounded-full text-sm whitespace-nowrap transition-all ${  
+        isActive  
+          ? 'text-blue-600 font-medium'  
+          : 'text-gray-600 hover:text-gray-900'  
+      }`}  
+    >  
+      <Text className="block">{label}</Text>  
+    </View>  
+  )  
+}  
+
+
+// 辅助组件：复选框  
+const FilterCheckbox = ({  
+  label,  
+  checked,  
+  onChange  
+}: {  
+  label: string  
+  checked: boolean  
+  onChange: (checked: boolean) => void  
+}) => {  
+  return (  
+    <View  
+      onClick={() => onChange(!checked)}  
+      className="flex items-center gap-2 cursor-pointer"  
+    >  
+      <View  
+        className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${  
+          checked  
+            ? 'bg-blue-600 border-blue-600'  
+            : 'border-gray-300 bg-white'  
+        }`}  
+      >  
+        {checked && <Check size={10} color="#ffffff" />}  
+      </View>  
+      <Text className="block text-sm text-gray-600">{label}</Text>  
+    </View>  
+  )  
+}
 
 interface MarketEvent {
   id: string
@@ -29,21 +117,16 @@ interface PaginationInfo {
 const IndexPage = () => {
   const [events, setEvents] = useState<MarketEvent[]>([])
   const [loading, setLoading] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('全部')
-  const [selectedSort, setSelectedSort] = useState('probability_desc')
+  const [selectedSort] = useState('probability_desc')
   const [hasMore, setHasMore] = useState(true)
   const [, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set())
-
-  const categories = ['全部', '热榜', '金融', '体育', '科技', '其他']
-  const sortOptions = [
-    { value: 'probability_desc', label: '概率从高到低' },
-    { value: 'probability_asc', label: '概率从低到高' },
-    { value: 'volume_desc', label: '热榜排名' },
-    { value: 'change_desc', label: '波动最大' }
-  ]
+  
+  // 新增状态：话题标签、隐藏选项
+  const [selectedTopic, setSelectedTopic] = useState('全部')
+  const [hiddenCategories, setHiddenCategories] = useState<Set<string>>(new Set())
 
   useLoad(() => {
     loadEvents()
@@ -285,39 +368,24 @@ const IndexPage = () => {
     return `$${num}`
   }
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    loadEvents().finally(() => {
-      setRefreshing(false)
-    })
-  }
-
   return (
     <View className="min-h-screen bg-gray-50">
-      {/* 顶部状态栏 */}
-      <View className="bg-white px-4 py-3 border-b border-gray-200">
+      {/* PolyMarket风格顶部标题栏 */}
+      <View className="bg-white px-4 py-3 border-b border-gray-100">
         <View className="flex items-center justify-between">
-          <Text className="block text-base font-bold text-gray-900">
-            概率之眼
+          <Text className="block text-xl font-bold text-gray-900">
+            所有盘口
           </Text>
-          <RefreshCw
-            size={20}
-            color="#666"
-            className={refreshing ? 'animate-spin' : ''}
-            onClick={handleRefresh}
-          />
-        </View>
-        <View className="flex items-center gap-2 mt-2">
-          <View className="w-2 h-2 rounded-full bg-green-500"></View>
-          <Text className="block text-xs text-gray-500">数据正常</Text>
-          <Text className="block text-xs text-gray-400">
-            最后更新: {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </Text>
+          <View className="flex items-center gap-3">
+            <Search size={22} color="#374151" />
+            <SlidersHorizontal size={22} color="#374151" />
+            <Bookmark size={22} color="#374151" />
+          </View>
         </View>
       </View>
 
-      {/* 分类标签和排序 */}
-      <View className="bg-white border-b border-gray-200">
+      {/* 主分类标签 - 胶囊样式 */}
+      <View className="bg-white border-b border-gray-100">
         <ScrollView
           scrollX
           className="px-4 py-3"
@@ -325,42 +393,92 @@ const IndexPage = () => {
         >
           <View className="flex flex-row gap-2">
             {categories.map((cat) => (
-              <View
+              <PillTag
                 key={cat}
-                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap ${
-                  selectedCategory === cat
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700'
-                }`}
+                label={cat}
+                variant="blue"
+                isActive={selectedCategory === cat}
                 onClick={() => setSelectedCategory(cat)}
-              >
-                <Text className="block">{cat}</Text>
-              </View>
+              />
             ))}
           </View>
         </ScrollView>
+      </View>
 
-        {/* 排序选择器 */}
-        {selectedCategory === '全部' && (
-          <View className="px-4 pb-3 flex items-center gap-2">
-            <Text className="block text-xs text-gray-500">排序：</Text>
-            <View className="flex flex-row gap-2 flex-wrap">
-              {sortOptions.map((opt) => (
-                <View
-                  key={opt.value}
-                  className={`px-3 py-1 rounded text-xs ${
-                    selectedSort === opt.value
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                  onClick={() => setSelectedSort(opt.value)}
-                >
-                  <Text className="block">{opt.label}</Text>
-                </View>
-              ))}
+      {/* 话题标签行 */}
+      <View className="bg-white border-b border-gray-100">
+        <ScrollView
+          scrollX
+          className="px-4 py-2"
+          showScrollbar={false}
+        >
+          <View className="flex flex-row items-center gap-1">
+            {topicTags.map((tag) => (
+              <PillTag
+                key={tag}
+                label={tag}
+                isActive={selectedTopic === tag}
+                onClick={() => setSelectedTopic(tag)}
+              />
+            ))}
+            <View className="p-1">
+              <ChevronsRight size={16} color="#9ca3af" />
             </View>
           </View>
-        )}
+        </ScrollView>
+      </View>
+
+      {/* 筛选区域 */}
+      <View className="bg-white px-4 py-3 border-b border-gray-200">
+        <View className="flex flex-row items-center gap-2 flex-wrap">
+          {/* 下拉筛选器 */}
+          <View className="flex items-center gap-2">
+            <View 
+              onClick={() => {}}
+              className="flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 bg-white"
+            >
+              <ArrowUpRight size={14} color="#22c55e" />
+              <Text className="block text-sm text-gray-700">24小时交易量</Text>
+              <ChevronDown size={14} color="#9ca3af" />
+            </View>
+            
+            <View 
+              onClick={() => {}}
+              className="flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 bg-white"
+            >
+              <Text className="block text-sm text-gray-700">全部</Text>
+              <ChevronDown size={14} color="#9ca3af" />
+            </View>
+            
+            <View 
+              onClick={() => {}}
+              className="flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 bg-white"
+            >
+              <Text className="block text-sm text-gray-700">进行中</Text>
+              <ChevronDown size={14} color="#9ca3af" />
+            </View>
+          </View>
+
+          {/* 复选框区域 */}
+          <View className="flex items-center gap-4 ml-auto">
+            {hideOptions.map((opt) => (
+              <FilterCheckbox
+                key={opt.id}
+                label={opt.label}
+                checked={hiddenCategories.has(opt.id)}
+                onChange={(checked) => {
+                  const newSet = new Set(hiddenCategories)
+                  if (checked) {
+                    newSet.add(opt.id)
+                  } else {
+                    newSet.delete(opt.id)
+                  }
+                  setHiddenCategories(newSet)
+                }}
+              />
+            ))}
+          </View>
+        </View>
       </View>
 
       {/* 事件列表 */}
