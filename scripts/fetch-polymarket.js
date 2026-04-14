@@ -10,9 +10,9 @@ const COS_CONFIG = {
   region: process.env.COS_REGION
 };
 
-// 豆包API配置
-const DOUBAO_API_KEY = process.env.COZE_API_KEY;
-const DOUBAO_API_URL = 'https://api.coze.cn/v3/chat';
+// 豆包API配置 - 使用火山引擎直接API
+const DOUBAO_API_KEY = process.env.COZE_API_KEY; // 使用COZE_API_KEY作为豆包API Key
+const DOUBAO_API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 /**
  * 调用豆包API批量翻译
@@ -52,37 +52,52 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
 
   return new Promise((resolve, reject) => {
     const postData = JSON.stringify({
-      bot_id: '7398091034558922764', // 使用通用翻译bot
-      user_id: 'github-actions',
-      additional_messages: [
-        { role: 'user', content: prompt, content_type: 'text' }
+      model: 'doubao-pro-32k-241115', // 使用豆包Pro模型
+      messages: [
+        { role: 'system', content: '你是一个专业的翻译助手，擅长将英文翻译成自然流畅的中文。' },
+        { role: 'user', content: prompt }
       ],
-      stream: false
+      temperature: 0.3,
+      max_tokens: 4096
     });
+
+    console.log('  发送请求到豆包API...');
 
     const req = https.request(DOUBAO_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DOUBAO_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Accept': '*/*'
-      }
+        'Content-Type': 'application/json'
+      },
+      timeout: 60000
     }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
+          console.log('  API响应状态:', res.statusCode);
+          
+          if (res.statusCode !== 200) {
+            console.error('❌ 豆包API返回错误状态:', res.statusCode);
+            console.error('  响应:', data.substring(0, 200));
+            resolve(texts.map(simpleTranslate));
+            return;
+          }
+          
           const result = JSON.parse(data);
-          if (result.code !== 0) {
-            console.error('豆包API错误:', result.msg);
-            // 降级使用简单翻译
+          
+          if (result.error) {
+            console.error('❌ 豆包API错误:', result.error.message || result.error);
             resolve(texts.map(simpleTranslate));
             return;
           }
 
-          // 解析翻译结果
-          const content = result.data?.messages?.[0]?.content || '';
+          // 解析翻译结果 - 豆包API返回格式
+          const content = result.choices?.[0]?.message?.content || '';
+          console.log('  收到翻译内容长度:', content.length);
+          
           const translations = content.split('\n').filter(line => line.trim());
+          console.log('  解析出行数:', translations.length, '期望:', texts.length);
 
           // 确保返回数量与输入一致
           if (translations.length >= texts.length) {
@@ -97,19 +112,20 @@ ${texts.map((t, i) => `${i + 1}. ${t}`).join('\n')}
             resolve(result);
           }
         } catch (e) {
-          console.error('解析豆包API响应失败:', e.message);
+          console.error('❌ 解析豆包API响应失败:', e.message);
+          console.error('  原始响应:', data.substring(0, 200));
           resolve(texts.map(simpleTranslate));
         }
       });
     });
 
     req.on('error', (err) => {
-      console.error('豆包API请求失败:', err.message);
+      console.error('❌ 豆包API请求失败:', err.message);
       resolve(texts.map(simpleTranslate));
     });
 
-    req.setTimeout(60000, () => {
-      console.error('豆包API超时');
+    req.on('timeout', () => {
+      console.error('❌ 豆包API超时');
       req.destroy();
       resolve(texts.map(simpleTranslate));
     });
