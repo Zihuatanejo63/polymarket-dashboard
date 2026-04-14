@@ -16,6 +16,15 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    - name: Debug Secrets
+      run: |
+        echo "Checking secrets..."
+        if [ -z "$COS_SECRET_ID" ]; then echo "❌ COS_SECRET_ID is not set"; exit 1; else echo "✅ COS_SECRET_ID is set"; fi
+        if [ -z "$COS_SECRET_KEY" ]; then echo "❌ COS_SECRET_KEY is not set"; exit 1; else echo "✅ COS_SECRET_KEY is set"; fi
+        if [ -z "$COS_BUCKET" ]; then echo "❌ COS_BUCKET is not set"; exit 1; else echo "✅ COS_BUCKET: $COS_BUCKET"; fi
+        if [ -z "$COS_REGION" ]; then echo "❌ COS_REGION is not set"; exit 1; else echo "✅ COS_REGION: $COS_REGION"; fi
+    
+    steps:
     - name: Checkout code
       uses: actions/checkout@v3
       
