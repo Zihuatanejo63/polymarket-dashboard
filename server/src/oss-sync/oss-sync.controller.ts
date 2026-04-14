@@ -109,4 +109,16 @@ export class OssSyncController {
       status: this.ossSyncService.getStatus()
     }
   }
+
+  /**
+   * 获取市场历史数据（用于概率图表）
+   */
+  @Get('history')
+  async getMarketHistory() {
+    const history = await this.ossSyncService.getMarketHistory()
+    return {
+      code: 200,
+      data: history
+    }
+  }
 }

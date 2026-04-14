@@ -20,46 +20,57 @@ interface MarketEvent {
   history7Days?: Array<{ date: string; probability: number }>
 }
 
-// 生成7天模拟历史数据
-const generateHistory7Days = (currentProb: number): Array<{ date: string; probability: number }> => {
-  const history: Array<{ date: string; probability: number }> = []
-  let prob = currentProb
-  const now = new Date()
-
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(now)
-    date.setDate(date.getDate() - i)
-
-    // 添加随机波动（-5% 到 +5%）
-    const fluctuation = (Math.random() - 0.5) * 10
-    if (i > 0) {
-      prob = Math.max(1, Math.min(99, prob - fluctuation))
-    } else {
-      prob = currentProb // 最后一天是当前概率
-    }
-
-    history.push({
-      date: date.toISOString().split('T')[0],
-      probability: Math.round(prob * 10) / 10
-    })
-  }
-
-  return history
-}
-
 const DetailPage = () => {
   const router = useRouter()
   const [event, setEvent] = useState<MarketEvent | null>(null)
   const [loading, setLoading] = useState(true)
   const [favorited, setFavorited] = useState(false)
+  const [historyData, setHistoryData] = useState<Array<{ date: string; probability: number }>>([])
 
   useLoad(() => {
     const { id } = router.params
     if (id) {
       loadEventDetail(id)
+      loadMarketHistory(id)
       checkFavorited(id)
     }
   })
+
+  // 从COS获取市场历史数据
+  const loadMarketHistory = async (id: string) => {
+    try {
+      const res = await Network.request({
+        url: '/api/polymarket-oss/history'
+      })
+
+      console.log('Market History Response:', res.data)
+
+      if (res.data?.code === 200 && res.data.data?.snapshots) {
+        const snapshots = res.data.data.snapshots
+        const marketHistory: Array<{ date: string; probability: number }> = []
+
+        // 从每个快照中提取该市场的概率
+        snapshots.forEach((snapshot: { timestamp: string; markets: Array<{ id: string; probability: number }> }) => {
+          const market = snapshot.markets.find((m: { id: string; probability: number }) => m.id === id)
+          if (market) {
+            const date = new Date(snapshot.timestamp)
+            marketHistory.push({
+              date: date.toISOString().split('T')[0],
+              probability: market.probability
+            })
+          }
+        })
+
+        // 只保留最近7天的数据，每天取最后一个值
+        const last7Days = marketHistory.slice(-7)
+        setHistoryData(last7Days)
+      }
+    } catch (error) {
+      console.error('加载历史数据失败:', error)
+      // 失败时使用空数组，不显示历史
+      setHistoryData([])
+    }
+  }
 
   const loadEventDetail = async (id: string) => {
     try {
@@ -82,8 +93,8 @@ const DetailPage = () => {
           volume24h: Number(m.volume),
           liquidity: Number(m.liquidity),
           category: m.categoryZh || m.tags?.[0]?.label || m.tags?.[0] || '其他',
-          change24h: Math.round((Math.random() - 0.5) * 20 * 10) / 10,
-          history7Days: generateHistory7Days(Number(m.probabilityRaw || m.probability))
+          change24h: m.change24h || 0,
+          history7Days: historyData.length > 0 ? historyData : undefined
         }
         setEvent(formattedEvent)
       }

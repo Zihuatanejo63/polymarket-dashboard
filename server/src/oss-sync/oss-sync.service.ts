@@ -210,4 +210,23 @@ export class OssSyncService {
     await this.loadDataFromCOS()
     return this.cachedData !== null
   }
+
+  /**
+   * 获取市场历史数据（从COS读取）
+   */
+  async getMarketHistory(): Promise<{ snapshots: any[]; marketCount: number }> {
+    try {
+      const historyUrl = `https://${this.cosConfig.bucket}.cos.${this.cosConfig.region}.myqcloud.com/polymarket-history.json`
+      const response = await lastValueFrom(this.httpService.get(historyUrl, { timeout: 10000 }))
+      const snapshots = response.data || []
+
+      return {
+        snapshots: snapshots.slice(-30), // 只返回最近30个快照
+        marketCount: snapshots.length > 0 ? snapshots[snapshots.length - 1]?.markets?.length || 0 : 0
+      }
+    } catch (error) {
+      console.error('Failed to fetch history from COS:', error)
+      return { snapshots: [], marketCount: 0 }
+    }
+  }
 }
