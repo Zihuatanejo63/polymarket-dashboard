@@ -2,6 +2,7 @@
 
 import COS from 'cos-nodejs-sdk-v5';
 import https from 'https';
+import { LLMClient, Config } from 'coze-coding-dev-sdk';
 
 const COS_CONFIG = {
   secretId: process.env.COS_SECRET_ID,
@@ -10,12 +11,86 @@ const COS_CONFIG = {
   region: process.env.COS_REGION
 };
 
+// 初始化LLM客户端
+const llmConfig = new Config();
+const llmClient = new LLMClient(llmConfig);
+
+// 翻译系统提示词
+const TRANSLATION_SYSTEM_PROMPT = `你是一个专业的预测市场标题翻译专家。
+
+请将以下英文预测市场问题翻译成中文，要求：
+1. 翻译准确、流畅，符合中文表达习惯
+2. 保持原意，不要添加或删除信息
+3. 对于专有名词（人名、地名、事件名），使用常用中文翻译
+4. 政治敏感词汇请适当处理
+5. 只需要输出翻译结果，不要解释
+
+常见翻译示例：
+- "Will X win Y?" → "X是否能赢得Y？"
+- "Will the price of Bitcoin exceed $100,000 by 2025?" → "比特币价格能在2025年前超过10万美元吗？"
+- "Who will win the 2024 US Presidential Election?" → "谁能赢得2024年美国总统选举？"
+- "Will there be a ceasefire in Gaza by March 2024?" → "加沙能在2024年3月前停火吗？"
+`;
+
 /**
- * 使用增强本地翻译（无需API）
+ * 使用Coze LLM API进行翻译
  */
 async function translateWithDoubao(texts) {
-  console.log(`🔄 使用本地增强翻译 ${texts.length} 条文本...`);
-  return texts.map(enhancedTranslate);
+  console.log(`🔄 使用Coze LLM API翻译 ${texts.length} 条文本...`);
+  
+  // 分批翻译，每批20条
+  const batchSize = 20;
+  const results = [];
+  
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    const batchNum = Math.floor(i / batchSize) + 1;
+    const totalBatches = Math.ceil(texts.length / batchSize);
+    
+    console.log(`  翻译批次 ${batchNum}/${totalBatches}...`);
+    
+    try {
+      // 构建批量翻译的prompt
+      const textList = batch.map((t, idx) => `${idx + 1}. ${t}`).join('\n');
+      const prompt = `请翻译以下${batch.length}个预测市场问题为中文（每行一个，只输出翻译结果）：\n\n${textList}`;
+      
+      const messages = [
+        { role: "system", content: TRANSLATION_SYSTEM_PROMPT },
+        { role: "user", content: prompt }
+      ];
+      
+      // 调用LLM API
+      const response = await llmClient.invoke(messages, {
+        model: 'doubao-seed-2-0-mini-260215',
+        temperature: 0.3
+      });
+      
+      // 解析响应
+      const translatedText = response.content.trim();
+      const lines = translatedText.split('\n').filter(line => line.trim());
+      
+      // 提取翻译结果
+      batch.forEach((original, idx) => {
+        const translated = lines[idx]?.replace(/^\d+\.\s*/, '').trim() || original;
+        results.push(translated);
+      });
+      
+      // 添加延迟避免API限流
+      if (i + batchSize < texts.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+    } catch (error) {
+      console.error(`  ⚠️ 批次 ${batchNum} 翻译失败: ${error.message}`);
+      // 降级使用本地翻译
+      batch.forEach(text => {
+        results.push(enhancedTranslate(text));
+      });
+    }
+  }
+  
+  console.log(`✅ 翻译完成 ${results.length} 条`);
+  return results;
 }
 
 /**
