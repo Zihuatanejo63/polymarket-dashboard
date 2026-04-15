@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { HttpService } from '@nestjs/axios'
 import { lastValueFrom } from 'rxjs'
-import { translateCategory, translateToChinese, formatProbability, formatVolume } from '../common/translation'
+import { translateCategory, translateToChinese, formatProbability, formatVolume, shouldProcessContent } from '../common/translation'
 
 export interface PolymarketData {
   markets: any[]
@@ -44,10 +44,21 @@ export class OssSyncService {
 
   /**
    * 翻译并格式化市场数据
+   * 只处理白名单类别（体育、科技、娱乐、金融）
    */
-  private formatMarket(market: any): any {
+  private formatMarket(market: any): any | null {
+    // 1. 白名单过滤
+    const rawTags = market.tags || []
+    const tags = rawTags.map((t: any) => typeof t === 'object' ? t?.label : t)
+    const filterResult = shouldProcessContent(market.question || '', tags)
+    
+    if (!filterResult.shouldProcess) {
+      // 跳过不在白名单的内容
+      return null
+    }
+
     // 获取原始标签
-    const rawTag = market.tags?.[0]
+    const rawTag = rawTags[0]
     const tagLabel = typeof rawTag === 'object' ? rawTag?.label : rawTag
 
     // 翻译分类
@@ -122,17 +133,23 @@ export class OssSyncService {
 
   /**
    * 获取市场数据（从缓存，包含翻译）
+   * 只返回白名单类别的内容
    */
   getMarkets(): any[] {
-    return (this.cachedData?.markets || []).map(m => this.formatMarket(m))
+    return (this.cachedData?.markets || [])
+      .map(m => this.formatMarket(m))
+      .filter(m => m !== null)
   }
 
   /**
    * 获取单个市场（包含翻译）
+   * 只返回白名单类别的内容
    */
   getMarketById(id: string): any | null {
     const market = this.cachedData?.markets.find(m => m.id === id)
-    return market ? this.formatMarket(market) : null
+    if (!market) return null
+    const formatted = this.formatMarket(market)
+    return formatted
   }
 
   /**
