@@ -29,10 +29,11 @@ jobs:
         if [ -z "$COS_REGION" ]; then echo "❌ COS_REGION is not set"; exit 1; else echo "✅ COS_REGION: $COS_REGION"; fi
         if [ -z "$COZE_API_KEY" ]; then echo "⚠️ COZE_API_KEY is not set (will use simple translation)"; else echo "✅ COZE_API_KEY is set"; fi
 
+    - name: Install pnpm
+      run: npm install -g pnpm
+
     - name: Install dependencies
-      run: |
-        cd scripts && npm install
+      run: pnpm install
 
     - name: Run Fetch Script
-      run: |
-        node scripts/fetch-polymarket.js
+      run: node scripts/fetch-polymarket.js
