@@ -190,8 +190,6 @@ const keywordTranslations: Record<string, string> = {
   'Microsoft': '微软',
   'Amazon': '亚马逊',
   'Meta': 'Meta',
-  'launch': '发布',
-  'product': '产品',
   'product': '产品',
   'IPO': '上市',
   'ipo': '上市',
