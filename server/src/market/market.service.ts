@@ -6,7 +6,8 @@ import { PolymarketService } from '../polymarket/polymarket.service'
 import { PolymarketGoldskyService } from '../polymarket-goldsky/polymarket-goldsky.service'
 import { PolymarketDuneService } from '../polymarket-dune/polymarket-dune.service'
 import { PolymarketProxyService } from '../polymarket-proxy/polymarket-proxy.service'
-import { PolymarketRealtimeService } from '../polymarket-realtime/polymarket-realtime.service'    
+import { PolymarketRealtimeService } from '../polymarket-realtime/polymarket-realtime.service'
+import { OssSyncService } from '../oss-sync/oss-sync.service'    
 
 export interface MarketEvent {
   id: string
@@ -38,11 +39,12 @@ export class MarketService {
     private duneService: PolymarketDuneService,
     private proxyService: PolymarketProxyService,
     private realtimeService: PolymarketRealtimeService,
+    private ossSyncService: OssSyncService,
   ) {}
 
   /**
    * 获取 Poly Market 数据
-   * 优先顺序：Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
+   * 优先顺序：Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> COS数据 -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -129,9 +131,39 @@ export class MarketService {
 
       return transformedEvents
     } catch (error) {
-      console.error('[MarketService] 获取 Poly Market 真实数据失败:', error.message)
-      console.log('[MarketService] 使用模拟数据作为降级方案')
+      console.error('[MarketService] 获取 Poly Market 真实数据失败:', error.message);
 
+    // 尝试从COS获取数据
+    try {
+      console.log('[MarketService] 尝试从COS获取数据...');
+      const cosMarkets = await this.ossSyncService.getMarkets();
+      if (cosMarkets && cosMarkets.length > 0) {
+        console.log(`[MarketService] 从COS获取了 ${cosMarkets.length} 个市场数据`);
+
+        // 转换COS数据格式
+        const transformedEvents = cosMarkets.map(m => ({
+          id: m.id,
+          question: m.question,
+          questionZh: m.questionZh || m.question,
+          probability: m.probability,
+          volume24h: m.volume || 0,
+          price: m.probability / 100,
+          liquidity: m.liquidity || 0,
+          category: m.categoryZh || '其他',
+          change24h: 0,
+        }));
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents;
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION);
+
+        return transformedEvents;
+      }
+    } catch (cosError) {
+      console.error('[MarketService] 从COS获取数据失败:', cosError.message);
+    }
+
+      console.log('[MarketService] 使用模拟数据作为降级方案');
       // 返回缓存的模拟数据（如果存在）
       if (this.cachedEvents) {
         return this.cachedEvents
