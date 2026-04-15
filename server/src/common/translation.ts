@@ -279,9 +279,6 @@ const keywordTranslations: Record<string, string> = {
   '2029': '2029年',
   '2030': '2030年',
   // 其他关键词
-  'win': '赢得',
-  'Win': '赢得',
-  'won': '赢得',
   'lose': '输掉',
   'lost': '输掉',
   'be': '是',
