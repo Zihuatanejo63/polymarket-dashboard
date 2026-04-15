@@ -327,6 +327,13 @@ export function translateToChinese(text: string): string {
   if (!text) return ''
 
   let translated = text
+  
+  // 修复重复的"年"（如"2028年年" -> "2028年"）
+  translated = translated.replace(/(\d+)年年/g, '$1年');
+  // 修复重复的"月"（如"5月月" -> "5月"）
+  translated = translated.replace(/(\d+)月月/g, '$1月');
+  // 修复重复的"日"（如"15日日" -> "15日"）
+  translated = translated.replace(/(\d+)日日/g, '$1日');
 
   // 按关键词长度降序替换（避免短词替换后影响长词匹配）
   const sortedKeywords = Object.keys(keywordTranslations).sort((a, b) => b.length - a.length)
