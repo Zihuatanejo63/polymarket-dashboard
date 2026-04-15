@@ -9,7 +9,7 @@ import { Star, Search, SlidersHorizontal, Bookmark } from 'lucide-react-taro'
 import './index.config'  
 
 // 分类配置  
-const categories = ['全部', '热榜', '金融', '体育', '科技', '其他']  
+const categories = ['全部', '政治', '金融', '体育', '科技', '其他']  
 
 
 // 辅助组件：胶囊标签  
@@ -141,13 +141,9 @@ const IndexPage = () => {
         // 根据类别筛选
         let filteredEvents = formattedEvents
         if (selectedCategory !== '全部') {
-          if (selectedCategory === '热榜') {
-            filteredEvents = [...formattedEvents].sort((a: MarketEvent, b: MarketEvent) => b.volume24h - a.volume24h)
-          } else {
-            filteredEvents = formattedEvents.filter((e: MarketEvent) =>
-              e.category.includes(selectedCategory)
-            )
-          }
+          filteredEvents = formattedEvents.filter((e: MarketEvent) =>
+            e.category.includes(selectedCategory)
+          )
         }
 
         // 根据排序选项排序
