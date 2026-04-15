@@ -44,7 +44,7 @@ export class MarketService {
 
   /**
    * 获取 Poly Market 数据
-   * 优先顺序：Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> COS数据 -> 模拟数据
+   * 优先顺序：COS数据 -> Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -53,8 +53,38 @@ export class MarketService {
       return this.cachedEvents
     }
 
+    // 优先尝试从COS获取数据（GitHub Actions抓取的最新数据，包含翻译）
     try {
-      // 优先尝试从 Realtime Service 获取数据（实时 + 无限制查询）
+      console.log('[MarketService] 尝试从COS获取数据...');
+      const cosMarkets = await this.ossSyncService.getMarkets();
+      if (cosMarkets && cosMarkets.length > 0) {
+        console.log(`[MarketService] 从COS获取了 ${cosMarkets.length} 个市场数据`);
+
+        // 转换COS数据格式
+        const transformedEvents = cosMarkets.map(m => ({
+          id: m.id,
+          question: m.question,
+          questionZh: m.questionZh || m.question,
+          probability: m.probability,
+          volume24h: m.volume || 0,
+          price: m.probability / 100,
+          liquidity: m.liquidity || 0,
+          category: m.categoryZh || '其他',
+          change24h: 0,
+        }));
+
+        // 更新缓存
+        this.cachedEvents = transformedEvents;
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION);
+
+        return transformedEvents;
+      }
+    } catch (cosError) {
+      console.error('[MarketService] 从COS获取数据失败:', cosError.message);
+    }
+
+    try {
+      // COS失败，尝试从 Realtime Service 获取数据（实时 + 无限制查询）
       console.log('[MarketService] 尝试从 Realtime Service 获取数据（实时 + 无限制查询）...')
       const realtimeMarkets = this.realtimeService.getAllMarkets()
       console.log(`[MarketService] 从 Realtime Service 获取了 ${realtimeMarkets.length} 个事件`)
@@ -96,7 +126,7 @@ export class MarketService {
     }
 
     try {
-      // Dune 失败，尝试从 Goldsky 获取真实数据
+      // Proxy 失败，尝试从 Dune 获取真实数据
       console.log('[MarketService] 尝试从 Goldsky 获取真实数据...')
       const goldskyEvents = await this.goldskyService.getActiveMarkets()
       console.log(`[MarketService] 从 Goldsky 获取了 ${goldskyEvents.length} 个事件`)
@@ -132,35 +162,6 @@ export class MarketService {
       return transformedEvents
     } catch (error) {
       console.error('[MarketService] 获取 Poly Market 真实数据失败:', error.message);
-
-    // 尝试从COS获取数据
-    try {
-      console.log('[MarketService] 尝试从COS获取数据...');
-      const cosMarkets = await this.ossSyncService.getMarkets();
-      if (cosMarkets && cosMarkets.length > 0) {
-        console.log(`[MarketService] 从COS获取了 ${cosMarkets.length} 个市场数据`);
-
-        // 转换COS数据格式
-        const transformedEvents = cosMarkets.map(m => ({
-          id: m.id,
-          question: m.question,
-          questionZh: m.questionZh || m.question,
-          probability: m.probability,
-          volume24h: m.volume || 0,
-          price: m.probability / 100,
-          liquidity: m.liquidity || 0,
-          category: m.categoryZh || '其他',
-          change24h: 0,
-        }));
-
-        // 更新缓存
-        this.cachedEvents = transformedEvents;
-        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION);
-
-        return transformedEvents;
-      }
-    } catch (cosError) {
-      console.error('[MarketService] 从COS获取数据失败:', cosError.message);
     }
 
       console.log('[MarketService] 使用模拟数据作为降级方案');

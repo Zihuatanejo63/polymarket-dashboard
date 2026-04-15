@@ -148,6 +148,10 @@ const TRANSLATIONS = {
   'Netanyahu': '内塔尼亚胡',
   'LeBron James': '勒布朗·詹姆斯',
   'Chelsea Clinton': '切尔西·克林顿',
+  'Andrew Yang': '杨安泽',
+  'Bernie Sanders': '伯尼·桑德斯',
+  'Oprah Winfrey': '奥普拉·温弗瑞',
+  'Oprah': '奥普拉',
   'Oprah Winfrey': '奥普拉·温弗瑞',
   'Jesus Christ': '耶稣基督',
   

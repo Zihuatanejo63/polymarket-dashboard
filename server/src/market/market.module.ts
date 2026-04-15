@@ -8,9 +8,10 @@ import { PolymarketGoldskyModule } from '../polymarket-goldsky/polymarket-goldsk
 import { PolymarketDuneModule } from '../polymarket-dune/polymarket-dune.module'
 import { PolymarketProxyModule } from '../polymarket-proxy/polymarket-proxy.module'
 import { PolymarketRealtimeModule } from '../polymarket-realtime/polymarket-realtime.module'
+import { OssSyncModule } from '../oss-sync/oss-sync.module'
 
 @Module({
-  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule],
+  imports: [HttpModule, ConfigModule, PolymarketModule, PolymarketGoldskyModule, PolymarketDuneModule, PolymarketProxyModule, PolymarketRealtimeModule, OssSyncModule],
   controllers: [MarketController],
   providers: [MarketService],
   exports: [MarketService],
