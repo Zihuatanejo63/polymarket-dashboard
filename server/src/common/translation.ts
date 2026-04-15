@@ -51,6 +51,8 @@ const keywordTranslations: Record<string, string> = {
   'clinton': '克林顿',
   'Hillary': '希拉里',
   'hillary': '希拉里',
+  'Chelsea': '切尔西',
+  'chelsea': '切尔西',
   'LeBron': '勒布朗',
   'lebron': '勒布朗',
   'James': '詹姆斯',
