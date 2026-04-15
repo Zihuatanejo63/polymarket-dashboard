@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "cos-nodejs-sdk-v5": "^2.13.0"
+    "cos-nodejs-sdk-v5": "^2.13.0",
+    "coze-coding-dev-sdk": "0.7.16"
   }
 }
