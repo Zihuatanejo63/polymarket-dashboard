@@ -298,13 +298,6 @@ const keywordTranslations: Record<string, string> = {
   'has': '有',
   'no later': '不晚于',
   'by': '在',
-  'before': '在...之前',
-  'after': '在...之后',
-  'until': '直到',
-  'during': '在...期间',
-  'first': '第一',
-  'Second': '第二',
-  'third': '第三',
 }
 
 /**
