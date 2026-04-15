@@ -151,7 +151,23 @@ const TRANSLATIONS = {
   'Andrew Yang': '杨安泽',
   'Bernie Sanders': '伯尼·桑德斯',
   'Oprah Winfrey': '奥普拉·温弗瑞',
-  'Oprah': '奥普拉',
+  'Tim Walz': '蒂姆·沃尔兹',
+  'Hillary Clinton': '希拉里·克林顿',
+  'George Clooney': '乔治·克鲁尼',
+  'Mike Pence': '迈克·彭斯',
+  'Ron DeSantis': '罗恩·德桑蒂斯',
+  'Nikki Haley': '尼基·黑利',
+  'Vladimir Putin': '弗拉基米尔·普京',
+  'Volodymyr Zelensky': '弗拉基米尔·泽连斯基',
+  'Benjamin Netanyahu': '本雅明·内塔尼亚胡',
+  'Robert Kennedy': '罗伯特·肯尼迪',
+  'Robert F. Kennedy': '罗伯特·肯尼迪',
+  'Kennedy': '肯尼迪',
+  'Obama': '奥巴马',
+  'Pelosi': '佩洛西',
+  'Warren Buffett': '沃伦·巴菲特',
+  'Buffett': '巴菲特',
+  'Taylor Swift': '泰勒·斯威夫特',
   'Oprah Winfrey': '奥普拉·温弗瑞',
   'Jesus Christ': '耶稣基督',
   
@@ -279,6 +295,18 @@ function enhancedTranslate(text) {
     ['Joe Biden', '乔·拜登'],
     ['Kamala Harris', '卡玛拉·哈里斯'],
     ['Elon Musk', '埃隆·马斯克'],
+    ['Andrew Yang', '杨安泽'],
+    ['Bernie Sanders', '伯尼·桑德斯'],
+    ['Tim Walz', '蒂姆·沃尔兹'],
+    ['Hillary Clinton', '希拉里·克林顿'],
+    ['George Clooney', '乔治·克鲁尼'],
+    ['Mike Pence', '迈克·彭斯'],
+    ['Ron DeSantis', '罗恩·德桑蒂斯'],
+    ['Nikki Haley', '尼基·黑利'],
+    ['Vladimir Putin', '弗拉基米尔·普京'],
+    ['Benjamin Netanyahu', '本雅明·内塔尼亚胡'],
+    ['Robert Kennedy', '罗伯特·肯尼迪'],
+    ['Taylor Swift', '泰勒·斯威夫特'],
     ['United States', '美国'],
     ['White House', '白宫'],
     ['Supreme Court', '最高法院'],
@@ -492,14 +520,57 @@ function transformData(rawData) {
     const tag = item.tags?.[0] || item.category || '';
     const tagLabel = typeof tag === 'object' ? tag?.label : tag;
 
+    // 基于标签的分类
     const categoryMap = {
-      'Finance': '金融', 'Crypto': '加密货币', 'Politics': '政治',
-      'US Politics': '美国政治', 'World': '国际', 'Sports': '体育',
-      'Technology': '科技', 'Science': '科学', 'Entertainment': '娱乐',
-      'Business': '商业', 'Economics': '经济', 'Elections': '选举',
-      'Bitcoin': '比特币', 'Ethereum': '以太坊', 'Stock Market': '股票',
-      'War': '战争', 'Geopolitics': '地缘政治'
+      'Finance': '金融', 'Crypto': '金融', 'Politics': '政治',
+      'US Politics': '政治', 'World': '政治', 'Sports': '体育',
+      'Technology': '科技', 'Science': '科技', 'Entertainment': '娱乐',
+      'Business': '金融', 'Economics': '金融', 'Elections': '政治',
+      'Bitcoin': '金融', 'Ethereum': '金融', 'Stock Market': '金融',
+      'War': '政治', 'Geopolitics': '政治'
     };
+
+    // 基于标题内容的智能分类
+    const question = (item.question || item.title || '').toLowerCase();
+    
+    // 体育关键词
+    const sportsKeywords = ['nba', 'nfl', 'mlb', 'nhl', 'football', 'basketball', 'soccer', 
+      'tennis', 'golf', 'mma', 'ufc', 'boxing', 'olympics', 'world cup', 'super bowl',
+      'lebron', 'messi', 'ronaldo', 'championship', 'playoffs', 'mvp', 'season win',
+      'gold medal', 'tournament', 'grand slam'];
+    
+    // 科技关键词  
+    const techKeywords = ['ai', 'apple', 'google', 'microsoft', 'meta', 'facebook', 
+      'amazon', 'tesla', 'openai', 'chatgpt', 'gpt', 'bitcoin', 'crypto', 'blockchain',
+      'elon musk', 'spacex', 'iphone', 'android', 'software', 'app', 'robot', 'quantum'];
+    
+    // 金融关键词
+    const financeKeywords = ['stock', 'market', 'fed', 'federal reserve', 'interest rate',
+      'inflation', 'gdp', 'recession', 'dollar', 'euro', 'yuan', 'bond', 'index',
+      's&p', 'nasdaq', 'dow jones', 'wall street', 'treasury', 'economy', 'trade'];
+    
+    // 政治关键词
+    const politicsKeywords = ['trump', 'biden', 'president', 'election', 'vote', 'congress',
+      'senate', 'house', 'republican', 'democratic', 'nomination', 'campaign', 'poll',
+      'supreme court', 'white house', 'governor', 'mayor', 'clinton', 'obama', 'sanders',
+      'harris', 'pelosi', 'putin', 'zelensky', 'netanyahu'];
+
+    let categoryZh = categoryMap[tagLabel] || '其他';
+    
+    // 如果标签分类失败，基于标题智能分类
+    if (categoryZh === '其他') {
+      if (sportsKeywords.some(kw => question.includes(kw))) {
+        categoryZh = '体育';
+      } else if (techKeywords.some(kw => question.includes(kw))) {
+        categoryZh = '科技';
+      } else if (financeKeywords.some(kw => question.includes(kw))) {
+        categoryZh = '金融';
+      } else if (politicsKeywords.some(kw => question.includes(kw))) {
+        categoryZh = '政治';
+      } else {
+        categoryZh = '其他';
+      }
+    }
 
     return {
       id: item.id || item.conditionId || String(Date.now() + Math.random()),
@@ -509,7 +580,7 @@ function transformData(rawData) {
       probability: probability,
       volume: parseFloat(item.volume || '0'),
       liquidity: parseFloat(item.liquidity || '0'),
-      categoryZh: categoryMap[tagLabel] || '其他',
+      categoryZh: categoryZh,
       slug: item.slug || '',
       expiresAt: item.expirationTime || item.expiresAt || '',
       updatedAt: new Date().toISOString()
