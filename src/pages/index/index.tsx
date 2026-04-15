@@ -283,10 +283,11 @@ const IndexPage = () => {
 
   const getCategoryColor = (category: string) => {
     const colorMap: Record<string, string> = {
-      '热榜': 'bg-orange-100 text-orange-700',
+      '政治': 'bg-red-100 text-red-700',
       '金融': 'bg-yellow-100 text-yellow-700',
       '体育': 'bg-green-100 text-green-700',
       '科技': 'bg-blue-100 text-blue-700',
+      '其他': 'bg-gray-100 text-gray-700',
       '全部': 'bg-gray-100 text-gray-700'
     }
     return colorMap[category] || 'bg-gray-100 text-gray-700'

@@ -215,12 +215,12 @@ const DetailPage = () => {
         // 使用后端返回的翻译后数据
         const formattedEvent: MarketEvent = {
           id: m.id,
-          question: m.question,
+          question: m.questionZh || m.question,
           probability: Number(m.probabilityRaw || m.probability),
           price: parseFloat(m.outcomePrices?.[1]) || m.probability / 100 || 0,
           volume24h: Number(m.volume),
           liquidity: Number(m.liquidity),
-          category: m.categoryZh || m.tags?.[0]?.label || m.tags?.[0] || '其他',
+          category: m.categoryZh || '其他',
           change24h: m.change24h || 0,
           history7Days: historyData.length > 0 ? historyData : undefined
         }
