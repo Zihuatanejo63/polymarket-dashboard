@@ -58,7 +58,9 @@ const keywordTranslations: Record<string, string> = {
   'James': '詹姆斯',
   'Yang': '杨',
   'yang': '杨',
-  'Andrew Yang': '杨安泽',
+  'Andrew Yang': '杨安泽'
+	  'LeBron James': '勒布朗·詹姆斯'
+	  'Bernie Sanders': '伯尼·桑德斯',
   'Sanders': '桑德斯',
   'sanders': '桑德斯',
   'Bernie': '伯尼',
