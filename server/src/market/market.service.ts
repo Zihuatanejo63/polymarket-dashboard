@@ -44,7 +44,7 @@ export class MarketService {
 
   /**
    * 获取 Poly Market 数据
-   * 优先顺序：COS数据 -> Realtime (实时+无限制) -> Proxy -> Dune -> Goldsky -> Poly Market 官方 API -> 模拟数据
+   * 优先顺序：COS数据（最新翻译版）-> Realtime -> Proxy -> Dune -> Goldsky -> Poly Market API -> 模拟数据
    */
   async getMarkets(): Promise<MarketEvent[]> {
     // 检查缓存
@@ -53,14 +53,13 @@ export class MarketService {
       return this.cachedEvents
     }
 
-    // 优先尝试从COS获取数据（GitHub Actions抓取的最新数据，包含翻译）
+    // 优先从COS获取数据（GitHub Actions抓取的最新数据，包含翻译）
     try {
       console.log('[MarketService] 尝试从COS获取数据...');
       const cosMarkets = await this.ossSyncService.getMarkets();
       if (cosMarkets && cosMarkets.length > 0) {
         console.log(`[MarketService] 从COS获取了 ${cosMarkets.length} 个市场数据`);
 
-        // 转换COS数据格式
         const transformedEvents = cosMarkets.map(m => ({
           id: m.id,
           question: m.question,
@@ -73,7 +72,6 @@ export class MarketService {
           change24h: 0,
         }));
 
-        // 更新缓存
         this.cachedEvents = transformedEvents;
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION);
 
@@ -84,16 +82,14 @@ export class MarketService {
     }
 
     try {
-      // COS失败，尝试从 Realtime Service 获取数据（实时 + 无限制查询）
+      // COS失败，从 Realtime Service 获取数据
       console.log('[MarketService] 尝试从 Realtime Service 获取数据（实时 + 无限制查询）...')
       const realtimeMarkets = this.realtimeService.getAllMarkets()
       console.log(`[MarketService] 从 Realtime Service 获取了 ${realtimeMarkets.length} 个事件`)
 
       if (realtimeMarkets.length > 0) {
-        // 转换数据格式
         const transformedEvents = this.transformRealtimeToMarket(realtimeMarkets)
 
-        // 更新缓存
         this.cachedEvents = transformedEvents
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
 
@@ -105,16 +101,14 @@ export class MarketService {
     }
 
     try {
-      // Realtime 失败，尝试从 Proxy Service 获取数据（无限制查询）
+      // Realtime 失败，从 Proxy Service 获取数据
       console.log('[MarketService] 尝试从 Proxy Service 获取数据（无限制查询）...')
       const proxyMarkets = await this.proxyService.getAllMarkets()
       console.log(`[MarketService] 从 Proxy Service 获取了 ${proxyMarkets.length} 个事件`)
 
       if (proxyMarkets.length > 0) {
-        // 转换数据格式
         const transformedEvents = this.transformProxyToMarket(proxyMarkets)
 
-        // 更新缓存
         this.cachedEvents = transformedEvents
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
 
@@ -126,16 +120,33 @@ export class MarketService {
     }
 
     try {
-      // Proxy 失败，尝试从 Dune 获取真实数据
+      // Proxy 失败，从 Dune 获取真实数据
+      console.log('[MarketService] 尝试从 Dune 获取真实数据...')
+      const duneEvents = await this.duneService.getActiveMarkets()
+      console.log(`[MarketService] 从 Dune 获取了 ${duneEvents.length} 个事件`)
+
+      if (duneEvents.length > 0) {
+        const transformedEvents = this.transformDuneToMarket(duneEvents)
+
+        this.cachedEvents = transformedEvents
+        this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+        console.log(`[MarketService] 成功使用 Dune 真实数据，共 ${transformedEvents.length} 个事件`)
+        return transformedEvents
+      }
+    } catch (error) {
+      console.error('[MarketService] 从 Dune 获取数据失败:', error.message)
+    }
+
+    try {
+      // Dune 失败，从 Goldsky 获取真实数据
       console.log('[MarketService] 尝试从 Goldsky 获取真实数据...')
       const goldskyEvents = await this.goldskyService.getActiveMarkets()
       console.log(`[MarketService] 从 Goldsky 获取了 ${goldskyEvents.length} 个事件`)
 
       if (goldskyEvents.length > 0) {
-        // 转换数据格式
         const transformedEvents = this.transformGoldskyToMarket(goldskyEvents)
 
-        // 更新缓存
         this.cachedEvents = transformedEvents
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
 
@@ -147,15 +158,13 @@ export class MarketService {
     }
 
     try {
-      // Goldsky 失败，尝试从 Poly Market 官方 API 获取真实数据
+      // Goldsky 失败，从 Poly Market 官方 API 获取真实数据
       console.log('[MarketService] 尝试从 Poly Market 官方 API 获取数据...')
       const polymarketData = await this.polymarketService.fetchPolymarketData()
       console.log(`从 Poly Market 获取了 ${polymarketData.length} 个真实事件`)
 
-      // 转换数据格式
       const transformedEvents = this.transformPolymarketToMarket(polymarketData)
 
-      // 更新缓存
       this.cachedEvents = transformedEvents
       this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
 
@@ -164,19 +173,16 @@ export class MarketService {
       console.error('[MarketService] 获取 Poly Market 真实数据失败:', error.message);
     }
 
-      console.log('[MarketService] 使用模拟数据作为降级方案');
-      // 返回缓存的模拟数据（如果存在）
-      if (this.cachedEvents) {
-        return this.cachedEvents
-      }
-
-      // 如果没有缓存，生成模拟数据
-      const mockData = this.getMockData()
-      this.cachedEvents = mockData
-      this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
-
-      return mockData
+    console.log('[MarketService] 使用模拟数据作为降级方案');
+    if (this.cachedEvents) {
+      return this.cachedEvents
     }
+
+    const mockData = this.getMockData()
+    this.cachedEvents = mockData
+    this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION)
+
+    return mockData
   }
 
   /**
