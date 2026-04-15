@@ -226,7 +226,7 @@ const TRANSLATIONS = {
   'May': '5月', 'June': '6月', 'July': '7月', 'August': '8月',
   'September': '9月', 'October': '10月', 'November': '11月', 'December': '12月',
   '2024': '2024年', '2025': '2025年', '2026': '2026年', '2027': '2027年', '2028': '2028年',
-  'year': '年', 'years': '年',
+  
   'month': '月', 'months': '月',
   'week': '周', 'weeks': '周',
   'day': '日', 'days': '天',
