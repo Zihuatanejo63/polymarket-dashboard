@@ -33,7 +33,8 @@ jobs:
       run: npm install -g pnpm
 
     - name: Install dependencies
-      run: pnpm install
+      run: |
+        cd scripts && pnpm install
 
     - name: Run Fetch Script
       run: node scripts/fetch-polymarket.js
