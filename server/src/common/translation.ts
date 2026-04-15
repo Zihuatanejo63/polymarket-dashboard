@@ -358,8 +358,8 @@ export function translateToChinese(text: string): string {
 
   for (const eng of sortedKeywords) {
     const chn = keywordTranslations[eng]
-    // 使用正则表达式，匹配完整单词
-    const regex = new RegExp(`\\b${eng}\\b`, 'g')
+    // 使用正则表达式，匹配完整单词（不区分大小写）
+    const regex = new RegExp(`\\b${eng}\\b`, 'gi')
     translated = translated.replace(regex, chn)
   }
 
