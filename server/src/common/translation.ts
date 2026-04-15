@@ -211,7 +211,6 @@ const keywordTranslations: Record<string, string> = {
   'Launch': '发布',
   'approve': '批准',
   'Approve': '批准',
-  'release': '发布',
   'Release': '发布',
   // 音乐/娱乐
   'album': '专辑',
